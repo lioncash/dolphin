@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <fcntl.h>
 #include <limits.h>
 #include <string>
@@ -829,8 +830,14 @@ void SetUserPath(unsigned int dir_index, const std::string& path)
 	RebuildUserDirectories(dir_index);
 }
 
-std::string GetThemeDir(const std::string& theme_name)
+std::string GetThemeDir(const std::string& theme_name_)
 {
+	std::string theme_name = theme_name_;
+	std::time_t timestamp = std::time(nullptr);
+	std::tm* now = std::localtime(&timestamp);
+	if (now->tm_mon == 3 && now->tm_mday == 1)
+		theme_name = theme_name.compare(0, 3, "pls") ? "pls Pink" : "Clean";
+
 	std::string dir = File::GetUserPath(D_THEMES_IDX) + theme_name + "/";
 
 	// If theme does not exist in user's dir load from shared directory
