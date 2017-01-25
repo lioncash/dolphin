@@ -57,9 +57,9 @@ static UVIBorderBlankRegister m_BorderHBlank;
 
 static u32 s_target_refresh_rate = 0;
 
-static u32 s_clock_freqs[2] = {
+static constexpr std::array<u32, 2> s_clock_freqs{{
     27000000UL, 54000000UL,
-};
+}};
 
 static u64 s_ticks_last_line_start;  // number of ticks when the current full scanline started
 static u32 s_half_line_count;        // number of halflines that have occurred for this full frame
