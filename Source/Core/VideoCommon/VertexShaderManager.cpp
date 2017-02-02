@@ -569,7 +569,7 @@ void VertexShaderManager::SetConstants()
       Matrix44::Set(mtxB, g_fProjectionMatrix);
       Matrix44::Multiply(mtxB, viewMtx, mtxA);               // mtxA = projection x view
       Matrix44::Multiply(s_viewportCorrection, mtxA, mtxB);  // mtxB = viewportCorrection x mtxA
-      memcpy(constants.projection, mtxB.data, 4 * sizeof(float4));
+      memcpy(constants.projection, mtxB.data.data(), 4 * sizeof(float4));
     }
     else
     {
@@ -578,7 +578,7 @@ void VertexShaderManager::SetConstants()
 
       Matrix44 correctedMtx;
       Matrix44::Multiply(s_viewportCorrection, projMtx, correctedMtx);
-      memcpy(constants.projection, correctedMtx.data, 4 * sizeof(float4));
+      memcpy(constants.projection, correctedMtx.data.data(), 4 * sizeof(float4));
     }
 
     dirty = true;

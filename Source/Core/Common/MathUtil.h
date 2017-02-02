@@ -5,7 +5,9 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
+#include <limits>
 #include <vector>
 
 #include "Common/CommonTypes.h"
@@ -221,7 +223,7 @@ public:
   static void Multiply(const Matrix33& a, const Matrix33& b, Matrix33& result);
   static void Multiply(const Matrix33& a, const float vec[3], float result[3]);
 
-  float data[9];
+  std::array<float, 9> data;
 };
 
 class Matrix44
@@ -236,5 +238,5 @@ public:
 
   static void Multiply(const Matrix44& a, const Matrix44& b, Matrix44& result);
 
-  float data[16];
+  std::array<float, 16> data;
 };

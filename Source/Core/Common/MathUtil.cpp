@@ -2,13 +2,16 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "Common/MathUtil.h"
+
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <limits>
 #include <numeric>
 
 #include "Common/CommonTypes.h"
-#include "Common/MathUtil.h"
 
 namespace MathUtil
 {
@@ -221,18 +224,20 @@ double ApproximateReciprocal(double val)
 
 }  // namespace
 
-inline void MatrixMul(int n, const float* a, const float* b, float* result)
+template <typename T, size_t N>
+void MatrixMul(size_t row_col_num, const std::array<T, N>& a, const std::array<T, N>& b,
+               std::array<T, N>& result)
 {
-  for (int i = 0; i < n; ++i)
+  for (size_t i = 0; i < row_col_num; ++i)
   {
-    for (int j = 0; j < n; ++j)
+    for (size_t j = 0; j < row_col_num; ++j)
     {
       float temp = 0;
-      for (int k = 0; k < n; ++k)
+      for (size_t k = 0; k < row_col_num; ++k)
       {
-        temp += a[i * n + k] * b[k * n + j];
+        temp += a[i * row_col_num + k] * b[k * row_col_num + j];
       }
-      result[i * n + j] = temp;
+      result[i * row_col_num + j] = temp;
     }
   }
 }
@@ -245,7 +250,7 @@ float MathFloatVectorSum(const std::vector<float>& Vec)
 
 void Matrix33::LoadIdentity(Matrix33& mtx)
 {
-  memset(mtx.data, 0, sizeof(mtx.data));
+  mtx.data = {};
   mtx.data[0] = 1.0f;
   mtx.data[4] = 1.0f;
   mtx.data[8] = 1.0f;
@@ -253,9 +258,10 @@ void Matrix33::LoadIdentity(Matrix33& mtx)
 
 void Matrix33::RotateX(Matrix33& mtx, float rad)
 {
-  float s = sin(rad);
-  float c = cos(rad);
-  memset(mtx.data, 0, sizeof(mtx.data));
+  const float s = sin(rad);
+  const float c = cos(rad);
+
+  mtx.data = {};
   mtx.data[0] = 1;
   mtx.data[4] = c;
   mtx.data[5] = -s;
@@ -264,9 +270,10 @@ void Matrix33::RotateX(Matrix33& mtx, float rad)
 }
 void Matrix33::RotateY(Matrix33& mtx, float rad)
 {
-  float s = sin(rad);
-  float c = cos(rad);
-  memset(mtx.data, 0, sizeof(mtx.data));
+  const float s = sin(rad);
+  const float c = cos(rad);
+
+  mtx.data = {};
   mtx.data[0] = c;
   mtx.data[2] = s;
   mtx.data[4] = 1;
@@ -294,7 +301,7 @@ void Matrix33::Multiply(const Matrix33& a, const float vec[3], float result[3])
 
 void Matrix44::LoadIdentity(Matrix44& mtx)
 {
-  memset(mtx.data, 0, sizeof(mtx.data));
+  mtx.data = {};
   mtx.data[0] = 1.0f;
   mtx.data[5] = 1.0f;
   mtx.data[10] = 1.0f;
