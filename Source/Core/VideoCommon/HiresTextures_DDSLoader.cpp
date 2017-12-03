@@ -9,10 +9,11 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <tuple>
+#include <utility>
 
 #include "Common/Align.h"
 #include "Common/File.h"
-#include "Common/Swap.h"
 #include "VideoCommon/VideoConfig.h"
 
 namespace

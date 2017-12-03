@@ -2,8 +2,9 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "VideoCommon/OnScreenDisplay.h"
+
 #include <algorithm>
-#include <list>
 #include <map>
 #include <string>
 
@@ -12,7 +13,6 @@
 
 #include "Core/ConfigManager.h"
 
-#include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/RenderBase.h"
 
 namespace OSD

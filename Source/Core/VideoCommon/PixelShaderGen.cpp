@@ -4,8 +4,6 @@
 
 #include "VideoCommon/PixelShaderGen.h"
 
-#include <cmath>
-#include <cstdio>
 #include <cstring>
 
 #include "Common/Assert.h"

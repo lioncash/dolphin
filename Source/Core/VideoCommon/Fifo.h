@@ -5,7 +5,6 @@
 #pragma once
 
 #include <cstddef>
-#include "Common/CommonTypes.h"
 
 class PointerWrap;
 

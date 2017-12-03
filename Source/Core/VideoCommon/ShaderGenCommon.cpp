@@ -3,7 +3,7 @@
 // Refer to the license.txt file included.
 
 #include "VideoCommon/ShaderGenCommon.h"
-#include "Common/CommonPaths.h"
+
 #include "Common/FileUtil.h"
 #include "Core/ConfigManager.h"
 

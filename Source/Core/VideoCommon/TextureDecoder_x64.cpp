@@ -3,8 +3,6 @@
 // Refer to the license.txt file included.
 
 #include <algorithm>
-#include <cmath>
-#include <cstring>
 
 #include "Common/CPUDetect.h"
 #include "Common/CommonTypes.h"

@@ -4,7 +4,6 @@
 
 #include "VideoCommon/VertexLoader_Normal.h"
 
-#include <cmath>
 #include <type_traits>
 
 #include "Common/Common.h"

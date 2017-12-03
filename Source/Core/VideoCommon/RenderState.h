@@ -7,7 +7,6 @@
 #include "Common/BitField.h"
 
 #include "VideoCommon/BPMemory.h"
-#include "VideoCommon/BPStructs.h"
 
 enum class PrimitiveType : u32
 {

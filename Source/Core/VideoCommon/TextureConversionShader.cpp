@@ -2,19 +2,18 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "VideoCommon/TextureConversionShader.h"
+
 #include <array>
-#include <cmath>
 #include <cstdio>
 #include <map>
 #include <sstream>
 
-#include "Common/CommonFuncs.h"
 #include "Common/CommonTypes.h"
 #include "Common/MathUtil.h"
 #include "Common/MsgHandler.h"
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/TextureCacheBase.h"
-#include "VideoCommon/TextureConversionShader.h"
 #include "VideoCommon/VideoCommon.h"
 
 #define WRITE p += sprintf

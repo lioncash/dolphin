@@ -5,7 +5,8 @@
 #pragma once
 
 #include "VideoCommon/ShaderGenCommon.h"
-#include "VideoCommon/VideoCommon.h"
+
+enum class APIType;
 
 namespace UberShader
 {

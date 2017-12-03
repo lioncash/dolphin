@@ -14,13 +14,11 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <tuple>
-#include <vector>
 
 #include "Common/CommonTypes.h"
 #include "Common/Event.h"

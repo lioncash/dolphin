@@ -4,7 +4,6 @@
 
 #include "VideoCommon/GeometryShaderGen.h"
 
-#include <cmath>
 #include <cstring>
 
 #include "Common/CommonTypes.h"

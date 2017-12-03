@@ -15,9 +15,9 @@
 // when they are called. The reason is that the vertex format affects the sizes of the vertices.
 
 #include "VideoCommon/OpcodeDecoding.h"
+
 #include "Common/CommonTypes.h"
 #include "Common/Logging/Log.h"
-#include "Common/MsgHandler.h"
 #include "Core/FifoPlayer/FifoRecorder.h"
 #include "Core/HW/Memmap.h"
 #include "VideoCommon/BPMemory.h"

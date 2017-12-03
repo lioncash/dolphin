@@ -2,7 +2,7 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include <cstring>
+#include "VideoCommon/VideoState.h"
 
 #include "Common/ChunkFile.h"
 #include "VideoCommon/BPMemory.h"
@@ -16,7 +16,6 @@
 #include "VideoCommon/TextureDecoder.h"
 #include "VideoCommon/VertexManagerBase.h"
 #include "VideoCommon/VertexShaderManager.h"
-#include "VideoCommon/VideoState.h"
 #include "VideoCommon/XFMemory.h"
 
 void VideoCommon_DoState(PointerWrap& p)

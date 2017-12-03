@@ -3,7 +3,10 @@
 // Refer to the license.txt file included.
 
 #include "VideoCommon/AsyncShaderCompiler.h"
+
 #include <thread>
+#include <utility>
+
 #include "Common/Assert.h"
 #include "Common/Logging/Log.h"
 

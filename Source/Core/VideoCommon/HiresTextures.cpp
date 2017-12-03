@@ -7,7 +7,6 @@
 #include <SOIL/SOIL.h>
 #include <algorithm>
 #include <cinttypes>
-#include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
