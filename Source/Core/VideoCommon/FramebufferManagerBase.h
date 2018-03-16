@@ -18,9 +18,9 @@ class FramebufferManagerBase
 public:
   virtual ~FramebufferManagerBase();
 
-  static unsigned int GetEFBLayers() { return m_EFBLayers; }
+  u32 GetEFBLayers() const { return m_EFBLayers; }
 protected:
-  static unsigned int m_EFBLayers;
+  unsigned int m_EFBLayers = 1;
 };
 
 extern std::unique_ptr<FramebufferManagerBase> g_framebuffer_manager;

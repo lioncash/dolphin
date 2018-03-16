@@ -27,32 +27,8 @@
 
 namespace OGL
 {
-int FramebufferManager::m_targetWidth;
-int FramebufferManager::m_targetHeight;
-int FramebufferManager::m_msaaSamples;
-bool FramebufferManager::m_enable_stencil_buffer;
-
-GLenum FramebufferManager::m_textureType;
-std::vector<GLuint> FramebufferManager::m_efbFramebuffer;
-GLuint FramebufferManager::m_efbColor;
-GLuint FramebufferManager::m_efbDepth;
-GLuint FramebufferManager::m_efbColorSwap;  // for hot swap when reinterpreting EFB pixel formats
-
-// Only used in MSAA mode.
-std::vector<GLuint> FramebufferManager::m_resolvedFramebuffer;
-GLuint FramebufferManager::m_resolvedColorTexture;
-GLuint FramebufferManager::m_resolvedDepthTexture;
-
-// reinterpret pixel format
-SHADER FramebufferManager::m_pixel_format_shaders[2];
-
-// EFB pokes
-GLuint FramebufferManager::m_EfbPokes_VBO;
-GLuint FramebufferManager::m_EfbPokes_VAO;
-SHADER FramebufferManager::m_EfbPokes;
-
 GLuint FramebufferManager::CreateTexture(GLenum texture_type, GLenum internal_format,
-                                         GLenum pixel_format, GLenum data_type)
+                                         GLenum pixel_format, GLenum data_type) const
 {
   GLuint texture;
   glActiveTexture(GL_TEXTURE9);
@@ -103,25 +79,16 @@ void FramebufferManager::BindLayeredTexture(GLuint texture, const std::vector<GL
   }
 }
 
-bool FramebufferManager::HasStencilBuffer()
+bool FramebufferManager::HasStencilBuffer() const
 {
   return m_enable_stencil_buffer;
 }
 
 FramebufferManager::FramebufferManager(int targetWidth, int targetHeight, int msaaSamples,
                                        bool enable_stencil_buffer)
+    : m_targetWidth{targetWidth}, m_targetHeight{targetHeight}, m_msaaSamples{msaaSamples},
+      m_enable_stencil_buffer{enable_stencil_buffer}
 {
-  m_efbColor = 0;
-  m_efbDepth = 0;
-  m_efbColorSwap = 0;
-  m_resolvedColorTexture = 0;
-  m_resolvedDepthTexture = 0;
-
-  m_targetWidth = targetWidth;
-  m_targetHeight = targetHeight;
-  m_msaaSamples = msaaSamples;
-  m_enable_stencil_buffer = enable_stencil_buffer;
-
   // The EFB can be set to different pixel formats by the game through the
   // BPMEM_ZCOMPARE register (which should probably have a different name).
   // They are:
@@ -444,6 +411,11 @@ FramebufferManager::~FramebufferManager()
   m_EfbPokes.Destroy();
 }
 
+FramebufferManager* FramebufferManager::GetInstance()
+{
+  return static_cast<FramebufferManager*>(g_framebuffer_manager.get());
+}
+
 GLuint FramebufferManager::GetEFBColorTexture(const EFBRectangle& sourceRc)
 {
   if (m_msaaSamples <= 1)
@@ -523,7 +495,7 @@ void FramebufferManager::ResolveEFBStencilTexture()
   glBindFramebuffer(GL_FRAMEBUFFER, m_efbFramebuffer[0]);
 }
 
-GLuint FramebufferManager::GetResolvedFramebuffer()
+GLuint FramebufferManager::GetResolvedFramebuffer() const
 {
   if (m_msaaSamples <= 1)
     return m_efbFramebuffer[0];

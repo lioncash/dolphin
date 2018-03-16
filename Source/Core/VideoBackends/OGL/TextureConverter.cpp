@@ -108,7 +108,7 @@ void Shutdown()
 static void EncodeToRamUsingShader(GLuint srcTexture, u8* destAddr, u32 dst_line_size,
                                    u32 dstHeight, u32 writeStride, bool linearFilter, float y_scale)
 {
-  FramebufferManager::SetFramebuffer(
+  FramebufferManager::GetInstance()->SetFramebuffer(
       static_cast<OGLTexture*>(s_encoding_render_texture.get())->GetFramebuffer());
 
   // set source texture
@@ -148,9 +148,9 @@ void EncodeToRamFromTexture(u8* dest_ptr, const EFBCopyParams& params, u32 nativ
               scale_by_half ? 2 : 1);
   glUniform1f(texconv_shader.y_scale_uniform, params.y_scale);
 
-  const GLuint read_texture = params.depth ?
-                                  FramebufferManager::ResolveAndGetDepthTarget(src_rect) :
-                                  FramebufferManager::ResolveAndGetRenderTarget(src_rect);
+  const GLuint read_texture =
+      params.depth ? FramebufferManager::GetInstance()->ResolveAndGetDepthTarget(src_rect) :
+                     FramebufferManager::GetInstance()->ResolveAndGetRenderTarget(src_rect);
 
   EncodeToRamUsingShader(read_texture, dest_ptr, bytes_per_row, num_blocks_y, memory_stride,
                          scale_by_half && !params.depth, params.y_scale);

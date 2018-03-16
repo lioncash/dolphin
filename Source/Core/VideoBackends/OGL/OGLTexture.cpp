@@ -149,13 +149,13 @@ OGLTexture::OGLTexture(const TextureConfig& tex_config) : AbstractTexture(tex_co
       }
     }
     glGenFramebuffers(1, &m_framebuffer);
-    FramebufferManager::SetFramebuffer(m_framebuffer);
-    FramebufferManager::FramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, m_texId,
-                                           0);
+    FramebufferManager::GetInstance()->SetFramebuffer(m_framebuffer);
+    FramebufferManager::GetInstance()->FramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                                          target, m_texId, 0);
 
     // We broke the framebuffer binding here, and need to restore it, as the CreateTexture
     // method is in the base renderer class and can be called by VideoCommon.
-    FramebufferManager::SetFramebuffer(0);
+    FramebufferManager::GetInstance()->SetFramebuffer(0);
   }
 }
 
@@ -234,20 +234,20 @@ void OGLTexture::BlitFramebuffer(OGLTexture* srcentry, const MathUtil::Rectangle
 
   if (update_src_framebuffer)
   {
-    FramebufferManager::FramebufferTexture(
+    FramebufferManager::GetInstance()->FramebufferTexture(
         GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
         srcentry->m_config.IsMultisampled() ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY : GL_TEXTURE_2D_ARRAY,
         srcentry->m_texId, 0);
   }
   if (update_dst_framebuffer)
   {
-    FramebufferManager::FramebufferTexture(
+    FramebufferManager::GetInstance()->FramebufferTexture(
         GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
         m_config.IsMultisampled() ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY : GL_TEXTURE_2D_ARRAY, m_texId,
         0);
   }
 
-  FramebufferManager::SetFramebuffer(0);
+  FramebufferManager::GetInstance()->SetFramebuffer(0);
 }
 
 void OGLTexture::ScaleRectangleFromTexture(const AbstractTexture* source,
@@ -258,12 +258,12 @@ void OGLTexture::ScaleRectangleFromTexture(const AbstractTexture* source,
   if (!m_framebuffer)
   {
     glGenFramebuffers(1, &m_framebuffer);
-    FramebufferManager::SetFramebuffer(m_framebuffer);
-    FramebufferManager::FramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                           GL_TEXTURE_2D_ARRAY, m_texId, 0);
+    FramebufferManager::GetInstance()->SetFramebuffer(m_framebuffer);
+    FramebufferManager::GetInstance()->FramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                                          GL_TEXTURE_2D_ARRAY, m_texId, 0);
   }
   g_renderer->ResetAPIState();
-  FramebufferManager::SetFramebuffer(m_framebuffer);
+  FramebufferManager::GetInstance()->SetFramebuffer(m_framebuffer);
   glActiveTexture(GL_TEXTURE9);
   glBindTexture(GL_TEXTURE_2D_ARRAY, srcentry->m_texId);
   g_sampler_cache->BindLinearSampler(9);
@@ -445,7 +445,7 @@ void OGLStagingTexture::CopyFromTexture(const AbstractTexture* src,
                  GetGLTypeForTextureFormat(m_config.format), reinterpret_cast<void*>(dst_offset));
 
     // Reset both read/draw framebuffers.
-    glBindFramebuffer(GL_FRAMEBUFFER, FramebufferManager::GetEFBFramebuffer());
+    glBindFramebuffer(GL_FRAMEBUFFER, FramebufferManager::GetInstance()->GetEFBFramebuffer());
   }
   else
   {
@@ -655,7 +655,7 @@ std::unique_ptr<OGLFramebuffer> OGLFramebuffer::Create(const OGLTexture* color_a
   }
 
   DEBUG_ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-  FramebufferManager::SetFramebuffer(0);
+  FramebufferManager::GetInstance()->SetFramebuffer(0);
   return std::make_unique<OGLFramebuffer>(color_format, depth_format, width, height, layers,
                                           samples, fbo);
 }

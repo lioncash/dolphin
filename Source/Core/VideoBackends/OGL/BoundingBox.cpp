@@ -126,12 +126,14 @@ int BoundingBox::Get(int index)
     {
       s_stencil_updated = false;
 
-      FramebufferManager::ResolveEFBStencilTexture();
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, FramebufferManager::GetResolvedFramebuffer());
+      FramebufferManager::GetInstance()->ResolveEFBStencilTexture();
+      glBindFramebuffer(GL_READ_FRAMEBUFFER,
+                        FramebufferManager::GetInstance()->GetResolvedFramebuffer());
       glBindBuffer(GL_PIXEL_PACK_BUFFER, s_pbo);
       glPixelStorei(GL_PACK_ALIGNMENT, 1);
       glReadPixels(0, 0, s_target_width, s_target_height, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, 0);
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, FramebufferManager::GetEFBFramebuffer());
+      glBindFramebuffer(GL_READ_FRAMEBUFFER,
+                        FramebufferManager::GetInstance()->GetEFBFramebuffer());
 
       // Eke every bit of performance out of the compiler that we can
       std::array<int, 4> bounds = s_stencil_bounds;

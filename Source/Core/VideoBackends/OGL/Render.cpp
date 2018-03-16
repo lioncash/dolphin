@@ -1000,8 +1000,9 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
         ResetAPIState();
 
         // Resolve our rectangle.
-        FramebufferManager::GetEFBDepthTexture(efbPixelRc);
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, FramebufferManager::GetResolvedFramebuffer());
+        FramebufferManager::GetInstance()->GetEFBDepthTexture(efbPixelRc);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER,
+                          FramebufferManager::GetInstance()->GetResolvedFramebuffer());
 
         RestoreAPIState();
       }
@@ -1039,8 +1040,9 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
         ResetAPIState();
 
         // Resolve our rectangle.
-        FramebufferManager::GetEFBColorTexture(efbPixelRc);
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, FramebufferManager::GetResolvedFramebuffer());
+        FramebufferManager::GetInstance()->GetEFBColorTexture(efbPixelRc);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER,
+                          FramebufferManager::GetInstance()->GetResolvedFramebuffer());
 
         RestoreAPIState();
       }
@@ -1103,7 +1105,7 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 
 void Renderer::PokeEFB(EFBAccessType type, const EfbPokeData* points, size_t num_points)
 {
-  FramebufferManager::PokeEFB(type, points, num_points);
+  FramebufferManager::GetInstance()->PokeEFB(type, points, num_points);
 }
 
 u16 Renderer::BBoxRead(int index)
@@ -1242,7 +1244,7 @@ void Renderer::ReinterpretPixelData(unsigned int convtype)
 {
   if (convtype == 0 || convtype == 2)
   {
-    FramebufferManager::ReinterpretPixelData(convtype);
+    FramebufferManager::GetInstance()->ReinterpretPixelData(convtype);
   }
   else
   {
@@ -1525,7 +1527,7 @@ void Renderer::DrawEFB(GLuint framebuffer, const TargetRectangle& target_rc,
                        const TargetRectangle& source_rc)
 {
   // for msaa mode, we must resolve the efb content to non-msaa
-  GLuint tex = FramebufferManager::ResolveAndGetRenderTarget(source_rc);
+  GLuint tex = FramebufferManager::GetInstance()->ResolveAndGetRenderTarget(source_rc);
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
   BlitScreen(source_rc, target_rc, tex, m_target_width, m_target_height);
 }
@@ -1555,7 +1557,7 @@ void Renderer::RestoreAPIState()
   m_current_framebuffer = nullptr;
   m_current_framebuffer_width = m_target_width;
   m_current_framebuffer_height = m_target_height;
-  FramebufferManager::SetFramebuffer(0);
+  FramebufferManager::GetInstance()->SetFramebuffer(0);
 
   // Gets us back into a more game-like state.
   glEnable(GL_SCISSOR_TEST);

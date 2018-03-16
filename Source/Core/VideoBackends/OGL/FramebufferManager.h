@@ -55,21 +55,28 @@ public:
                      bool enable_stencil_buffer);
   ~FramebufferManager();
 
+  // TODO: This should be removed as all it does is make using the
+  //       global framebuffer manager instance nicer. This will be
+  //       able to be removed when the globals are eliminated and replaced
+  //       with per-backend members that use the proper type, eliminating
+  //       the need for functions to downcast to the correct type.
+  static FramebufferManager* GetInstance();
+
   // To get the EFB in texture form, these functions may have to transfer
   // the EFB to a resolved texture first.
-  static GLuint GetEFBColorTexture(const EFBRectangle& sourceRc);
-  static GLuint GetEFBDepthTexture(const EFBRectangle& sourceRc);
-  static void ResolveEFBStencilTexture();
+  GLuint GetEFBColorTexture(const EFBRectangle& sourceRc);
+  GLuint GetEFBDepthTexture(const EFBRectangle& sourceRc);
+  void ResolveEFBStencilTexture();
 
-  static GLuint GetEFBFramebuffer(unsigned int layer = 0)
+  GLuint GetEFBFramebuffer(unsigned int layer = 0) const
   {
     return (layer < m_EFBLayers) ? m_efbFramebuffer[layer] : m_efbFramebuffer.back();
   }
   // Resolved framebuffer is only used in MSAA mode.
-  static GLuint GetResolvedFramebuffer();
-  static void SetFramebuffer(GLuint fb);
-  static void FramebufferTexture(GLenum target, GLenum attachment, GLenum textarget, GLuint texture,
-                                 GLint level);
+  GLuint GetResolvedFramebuffer() const;
+  void SetFramebuffer(GLuint fb);
+  void FramebufferTexture(GLenum target, GLenum attachment, GLenum textarget, GLuint texture,
+                          GLint level);
 
   // If in MSAA mode, this will perform a resolve of the specified rectangle, and return the resolve
   // target as a texture ID.
@@ -77,51 +84,51 @@ public:
   // If not in MSAA mode, will just return the render target texture ID.
   // After calling this, before you render anything else, you MUST bind the framebuffer you want to
   // draw to.
-  static GLuint ResolveAndGetRenderTarget(const EFBRectangle& rect);
+  GLuint ResolveAndGetRenderTarget(const EFBRectangle& source_rect);
 
   // Same as above but for the depth Target.
   // After calling this, before you render anything else, you MUST bind the framebuffer you want to
   // draw to.
-  static GLuint ResolveAndGetDepthTarget(const EFBRectangle& rect);
+  GLuint ResolveAndGetDepthTarget(const EFBRectangle& source_rect);
 
   // Convert EFB content on pixel format change.
   // convtype=0 -> rgb8->rgba6, convtype=2 -> rgba6->rgb8
-  static void ReinterpretPixelData(unsigned int convtype);
+  void ReinterpretPixelData(unsigned int convtype);
 
-  static void PokeEFB(EFBAccessType type, const EfbPokeData* points, size_t num_points);
-  static bool HasStencilBuffer();
+  void PokeEFB(EFBAccessType type, const EfbPokeData* points, size_t num_points);
+  bool HasStencilBuffer() const;
 
 private:
   GLuint CreateTexture(GLenum texture_type, GLenum internal_format, GLenum pixel_format,
-                       GLenum data_type);
+                       GLenum data_type) const;
   void BindLayeredTexture(GLuint texture, const std::vector<GLuint>& framebuffers,
                           GLenum attachment, GLenum texture_type);
 
-  static int m_targetWidth;
-  static int m_targetHeight;
-  static int m_msaaSamples;
+  int m_targetWidth = 0;
+  int m_targetHeight = 0;
+  int m_msaaSamples = 0;
 
-  static GLenum m_textureType;
-  static std::vector<GLuint> m_efbFramebuffer;
-  static GLuint m_efbColor;
-  static GLuint m_efbDepth;
-  static GLuint
-      m_efbColorSwap;  // will be hot swapped with m_efbColor when reinterpreting EFB pixel formats
+  GLenum m_textureType = 0;
+  std::vector<GLuint> m_efbFramebuffer;
+  GLuint m_efbColor = 0;
+  GLuint m_efbDepth = 0;
+  // will be hot swapped with m_efbColor when reinterpreting EFB pixel formats
+  GLuint m_efbColorSwap = 0;
 
-  static bool m_enable_stencil_buffer;
+  bool m_enable_stencil_buffer = false;
 
   // Only used in MSAA mode, TODO: try to avoid them
-  static std::vector<GLuint> m_resolvedFramebuffer;
-  static GLuint m_resolvedColorTexture;
-  static GLuint m_resolvedDepthTexture;
+  std::vector<GLuint> m_resolvedFramebuffer;
+  GLuint m_resolvedColorTexture = 0;
+  GLuint m_resolvedDepthTexture = 0;
 
   // For pixel format draw
-  static SHADER m_pixel_format_shaders[2];
+  SHADER m_pixel_format_shaders[2];
 
   // For EFB pokes
-  static GLuint m_EfbPokes_VBO;
-  static GLuint m_EfbPokes_VAO;
-  static SHADER m_EfbPokes;
+  GLuint m_EfbPokes_VBO = 0;
+  GLuint m_EfbPokes_VAO = 0;
+  SHADER m_EfbPokes;
 };
 
 }  // namespace OGL

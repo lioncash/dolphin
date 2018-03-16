@@ -1732,7 +1732,7 @@ void TextureCacheBase::CopyRenderTargetToTexture(u32 dstAddr, EFBCopyFormat dstF
     config.rendertarget = true;
     config.width = scaled_tex_w;
     config.height = scaled_tex_h;
-    config.layers = FramebufferManagerBase::GetEFBLayers();
+    config.layers = g_framebuffer_manager->GetEFBLayers();
 
     TCacheEntry* entry = AllocateCacheEntry(config);
 

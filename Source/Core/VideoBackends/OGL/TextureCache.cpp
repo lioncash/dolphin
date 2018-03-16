@@ -301,7 +301,7 @@ void TextureCache::ConvertTexture(TCacheEntry* destination, TCacheEntry* source,
   glBindTexture(GL_TEXTURE_2D_ARRAY, source_texture->GetRawTexIdentifier());
   g_sampler_cache->BindNearestSampler(9);
 
-  FramebufferManager::SetFramebuffer(destination_texture->GetFramebuffer());
+  FramebufferManager::GetInstance()->SetFramebuffer(destination_texture->GetFramebuffer());
   glViewport(0, 0, destination->GetWidth(), destination->GetHeight());
   palette_shader.shader.Bind();
 
@@ -489,11 +489,11 @@ void TextureCache::CopyEFBToCacheEntry(TCacheEntry* entry, bool is_depth_copy,
   g_renderer->ResetAPIState();  // reset any game specific settings
 
   // Make sure to resolve anything we need to read from.
-  const GLuint read_texture = is_depth_copy ?
-                                  FramebufferManager::ResolveAndGetDepthTarget(src_rect) :
-                                  FramebufferManager::ResolveAndGetRenderTarget(src_rect);
+  const GLuint read_texture =
+      is_depth_copy ? FramebufferManager::GetInstance()->ResolveAndGetDepthTarget(src_rect) :
+                      FramebufferManager::GetInstance()->ResolveAndGetRenderTarget(src_rect);
 
-  FramebufferManager::SetFramebuffer(destination_texture->GetFramebuffer());
+  FramebufferManager::GetInstance()->SetFramebuffer(destination_texture->GetFramebuffer());
 
   glActiveTexture(GL_TEXTURE9);
   glBindTexture(GL_TEXTURE_2D_ARRAY, read_texture);

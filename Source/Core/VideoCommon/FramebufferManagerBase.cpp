@@ -6,10 +6,6 @@
 
 #include <memory>
 
-#include "VideoCommon/RenderBase.h"
-
 std::unique_ptr<FramebufferManagerBase> g_framebuffer_manager;
-
-unsigned int FramebufferManagerBase::m_EFBLayers = 1;
 
 FramebufferManagerBase::~FramebufferManagerBase() = default;
