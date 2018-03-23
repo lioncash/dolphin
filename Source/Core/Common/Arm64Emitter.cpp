@@ -3018,9 +3018,9 @@ void ARM64FloatEmitter::FMOV(ARM64Reg Rd, ARM64Reg Rn, bool top)
   else
   {
     ASSERT_MSG(DYNA_REC, !IsQuad(Rd) && !IsQuad(Rn), "FMOV can't move to/from quads");
-    int rmode = 0;
-    int opcode = 6;
-    int sf = 0;
+    u32 rmode = 0;
+    u32 opcode = 6;
+    u32 sf = 0;
     if (IsSingle(Rd) && !Is64Bit(Rn) && !top)
     {
       // GPR to scalar single
@@ -4293,15 +4293,15 @@ bool ARM64XEmitter::TryEORI2R(ARM64Reg Rd, ARM64Reg Rn, u32 imm)
   return true;
 }
 
-float FPImm8ToFloat(uint8_t bits)
+float FPImm8ToFloat(u8 bits)
 {
-  int sign = bits >> 7;
-  uint32_t f = (sign << 31);
-  int bit6 = (bits >> 6) & 1;
-  uint32_t exp = ((!bit6) << 7) | (0x7C * bit6) | ((bits >> 4) & 3);
-  uint32_t mantissa = (bits & 0xF) << 19;
-  f |= exp << 23;
-  f |= mantissa;
+  const u32 sign = bits >> 7;
+  const u32 bit6 = (bits >> 6) & 1;
+  const u32 exp = ((!bit6) << 7) | (0x7C * bit6) | ((bits >> 4) & 3);
+  const u32 mantissa = (bits & 0xF) << 19;
+
+  const u32 f = (sign << 31) | (exp << 23) | mantissa;
+
   float fl;
   memcpy(&fl, &f, sizeof(float));
   return fl;
