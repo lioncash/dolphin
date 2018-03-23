@@ -1114,10 +1114,10 @@ void Jit64::divwux(UGeckoInstruction inst)
     else
     {
       u32 shift = 31;
-      while (!(divisor & (1 << shift)))
+      while (!(divisor & (1U << shift)))
         shift--;
 
-      if (divisor == (u32)(1 << shift))
+      if (divisor == 1U << shift)
       {
         gpr.Lock(a, b, d);
         gpr.BindToRegister(d, d == a, true);
@@ -1211,7 +1211,7 @@ void Jit64::divwx(UGeckoInstruction inst)
     s32 i = gpr.R(a).SImm32(), j = gpr.R(b).SImm32();
     if (j == 0 || (i == (s32)0x80000000 && j == -1))
     {
-      gpr.SetImmediate32(d, (i >> 31) ^ j);
+      gpr.SetImmediate32(d, (static_cast<u32>(i) >> 31) ^ j);
       if (inst.OE)
         GenerateConstantOverflow(true);
     }
