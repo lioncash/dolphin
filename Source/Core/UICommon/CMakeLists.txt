@@ -24,7 +24,7 @@ if(USE_X11)
 endif()
 
 if(LIBUSB_FOUND)
-  target_link_libraries(uicommon PRIVATE ${LIBUSB_LIBRARIES})
+  target_link_libraries(uicommon PRIVATE LibUSB::LibUSB)
 endif()
 
 if(ENABLE_LLVM)

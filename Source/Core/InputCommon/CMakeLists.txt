@@ -70,7 +70,7 @@ if(ANDROID)
   target_sources(inputcommon PRIVATE GCAdapter_Android.cpp)
 else()
   target_sources(inputcommon PRIVATE GCAdapter.cpp)
-  target_link_libraries(inputcommon PUBLIC ${LIBUSB_LIBRARIES})
+  target_link_libraries(inputcommon PRIVATE LibUSB::LibUSB)
 endif()
 
 if(LIBEVDEV_FOUND AND LIBUDEV_FOUND)

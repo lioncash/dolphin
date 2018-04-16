@@ -1,8 +1,14 @@
 # - Find libusb-1.0 library
-# This module defines
-#  LIBUSB_INCLUDE_DIR, where to find bluetooth.h
-#  LIBUSB_LIBRARIES, the libraries needed to use libusb-1.0.
-#  LIBUSB_FOUND, If false, do not try to use libusb-1.0.
+#
+# This module defines the following variables:
+#
+#  - LIBUSB_INCLUDE_DIR: Where to find bluetooth.h
+#  - LIBUSB_LIBRARIES: The libraries needed to use libusb-1.0.
+#  - LIBUSB_FOUND: If false, do not try to use libusb-1.0.
+#
+# This module also defines the following target:
+#
+# - LibUSB::LibUSB
 #
 # Copyright (c) 2009, Michal Cihar, <michal@cihar.com>
 
@@ -37,6 +43,14 @@ elseif (NOT LIBUSB_FOUND)
   find_package_handle_standard_args(LibUSB DEFAULT_MSG
     LIBUSB_LIBRARIES LIBUSB_INCLUDE_DIR
   )
+
+  if (LIBUSB_FOUND AND NOT TARGET LibUSB::LibUSB)
+    add_library(LibUSB::LibUSB UNKNOWN IMPORTED)
+    set_target_properties(LibUSB::LibUSB PROPERTIES
+      IMPORTED_LOCATION ${LIBUSB_LIBRARIES}
+      INTERFACE_INCLUDE_DIRECTORIES ${LIBUSB_INCLUDE_DIR}
+    )
+  endif()
 
   mark_as_advanced(LIBUSB_INCLUDE_DIR LIBUSB_LIBRARIES)
 endif()

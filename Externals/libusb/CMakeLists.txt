@@ -1,4 +1,4 @@
-add_library(usb STATIC EXCLUDE_FROM_ALL
+add_library(LibUSB STATIC EXCLUDE_FROM_ALL
     libusb/core.c
     libusb/core.c
     libusb/descriptor.c
@@ -7,11 +7,13 @@ add_library(usb STATIC EXCLUDE_FROM_ALL
     libusb/strerror.c
     libusb/sync.c
 )
-set_target_properties(usb PROPERTIES VERSION 1.0.19)
+add_library(LibUSB::LibUSB ALIAS LibUSB)
+
+set_target_properties(LibUSB PROPERTIES VERSION 1.0.19)
 if(WIN32)
-    target_include_directories(usb BEFORE PUBLIC libusb PRIVATE msvc)
+    target_include_directories(LibUSB BEFORE PUBLIC libusb PRIVATE msvc)
 else()
-target_include_directories(usb
+target_include_directories(LibUSB
     # turns out other projects also have "config.h", so make sure the
     # LibUSB one comes first
     BEFORE
@@ -22,7 +24,7 @@ target_include_directories(usb
 endif()
 
 if(WIN32 OR CYGWIN)
-    target_sources(usb PRIVATE
+    target_sources(LibUSB PRIVATE
       libusb/os/threads_windows.c
       libusb/os/windows_winusb.c
       libusb/os/windows_usbdk.c
@@ -30,11 +32,11 @@ if(WIN32 OR CYGWIN)
     )
     set(OS_WINDOWS TRUE)
 elseif(APPLE)
-    target_sources(usb PRIVATE libusb/os/darwin_usb.c)
+    target_sources(LibUSB PRIVATE libusb/os/darwin_usb.c)
     find_library(COREFOUNDATION_LIBRARY CoreFoundation)
     find_library(IOKIT_LIBRARY IOKit)
     find_library(OBJC_LIBRARY objc)
-    target_link_libraries(usb PRIVATE
+    target_link_libraries(LibUSB PRIVATE
         ${COREFOUNDATION_LIBRARY}
         ${IOKIT_LIBRARY}
         ${OBJC_LIBRARY}
@@ -42,49 +44,49 @@ elseif(APPLE)
     set(OS_DARWIN TRUE)
 # # Dolphin on Android doesn't use libusb.
 #elseif(ANDROID)
-#    target_sources(usb PRIVATE
+#    target_sources(LibUSB PRIVATE
 #        libusb/os/linux_usbfs.c
 #        libusb/os/linux_netlink.c
 #    )
 #    find_library(LOG_LIBRARY log)
-#    target_link_libraries(usb PRIVATE ${LOG_LIBRARY})
+#    target_link_libraries(LibUSB PRIVATE ${LOG_LIBRARY})
 #    set(OS_LINUX TRUE)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    target_sources(usb PRIVATE libusb/os/linux_usbfs.c)
+    target_sources(LibUSB PRIVATE libusb/os/linux_usbfs.c)
     find_package(Libudev)
     if(LIBUDEV_FOUND)
-        target_sources(usb PRIVATE libusb/os/linux_udev.c)
-        target_link_libraries(usb PRIVATE "${LIBUDEV_LIBRARIES}")
-        target_include_directories(usb PRIVATE "${LIBUDEV_INCLUDE_DIR}")
+        target_sources(LibUSB PRIVATE libusb/os/linux_udev.c)
+        target_link_libraries(LibUSB PRIVATE "${LIBUDEV_LIBRARIES}")
+        target_include_directories(LibUSB PRIVATE "${LIBUDEV_INCLUDE_DIR}")
         set(HAVE_LIBUDEV TRUE)
         set(USE_UDEV TRUE)
     else()
-        target_sources(usb PRIVATE libusb/os/linux_netlink.c)
+        target_sources(LibUSB PRIVATE libusb/os/linux_netlink.c)
     endif()
     set(OS_LINUX TRUE)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "NetBSD")
-    target_sources(usb PRIVATE libusb/os/netbsd_usb.c)
+    target_sources(LibUSB PRIVATE libusb/os/netbsd_usb.c)
     set(OS_NETBSD TRUE)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD")
-    target_sources(usb PRIVATE libusb/os/openbsd_usb.c)
+    target_sources(LibUSB PRIVATE libusb/os/openbsd_usb.c)
     set(OS_OPENBSD TRUE)
 endif()
 
 if(UNIX)
-    target_sources(usb PRIVATE
+    target_sources(LibUSB PRIVATE
         libusb/os/poll_posix.c
         libusb/os/threads_posix.c
     )
     find_package(Threads REQUIRED)
     if(THREADS_HAVE_PTHREAD_ARG)
-      target_compile_options(usb PUBLIC "-pthread")
+      target_compile_options(LibUSB PUBLIC "-pthread")
     endif()
     if(CMAKE_THREAD_LIBS_INIT)
-      target_link_libraries(usb PRIVATE "${CMAKE_THREAD_LIBS_INIT}")
+      target_link_libraries(LibUSB PRIVATE "${CMAKE_THREAD_LIBS_INIT}")
     endif()
     set(THREADS_POSIX TRUE)
 elseif(WIN32)
-    target_sources(usb PRIVATE
+    target_sources(LibUSB PRIVATE
         libusb/os/poll_windows.c
         libusb/os/threads_windows.c
     )

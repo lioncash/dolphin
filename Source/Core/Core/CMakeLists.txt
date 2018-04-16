@@ -307,7 +307,7 @@ endif()
 
 if(LIBUSB_FOUND)
   # Using shared LibUSB
-  target_link_libraries(core PUBLIC ${LIBUSB_LIBRARIES})
+  target_link_libraries(core PRIVATE LibUSB::LibUSB)
   target_sources(core PRIVATE
     IOS/USB/LibusbDevice.cpp
     IOS/USB/Bluetooth/BTReal.cpp
