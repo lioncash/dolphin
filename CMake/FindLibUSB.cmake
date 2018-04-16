@@ -33,13 +33,10 @@ elseif (NOT LIBUSB_FOUND)
       /usr/local/lib
   )
 
-  if(LIBUSB_INCLUDE_DIR AND LIBUSB_LIBRARIES)
-    set(LIBUSB_FOUND TRUE CACHE INTERNAL "libusb-1.0 found")
-    message(STATUS "Found libusb-1.0: ${LIBUSB_INCLUDE_DIR}, ${LIBUSB_LIBRARIES}")
-  else(LIBUSB_INCLUDE_DIR AND LIBUSB_LIBRARIES)
-    set(LIBUSB_FOUND FALSE CACHE INTERNAL "libusb-1.0 found")
-    message(STATUS "libusb-1.0 not found.")
-  endif(LIBUSB_INCLUDE_DIR AND LIBUSB_LIBRARIES)
+  include(FindPackageHandleStandardArgs)
+  find_package_handle_standard_args(LibUSB DEFAULT_MSG
+    LIBUSB_LIBRARIES LIBUSB_INCLUDE_DIR
+  )
 
   mark_as_advanced(LIBUSB_INCLUDE_DIR LIBUSB_LIBRARIES)
 endif()
