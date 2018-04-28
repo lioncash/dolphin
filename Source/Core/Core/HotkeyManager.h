@@ -17,6 +17,8 @@ class ControllerEmu;
 class Buttons;
 }
 
+// When adding to this enum, ensure a corresponding label
+// is provided in the cpp file in the s_hotkey_labels array.
 enum Hotkey
 {
   HK_OPEN,
@@ -189,7 +191,7 @@ struct HotkeyGroupInfo
 
 struct HotkeyStatus
 {
-  u32 button[NUM_HOTKEY_GROUPS];
+  std::array<u32, NUM_HOTKEY_GROUPS> button;
   s8 err;
 };
 
@@ -207,7 +209,7 @@ public:
   void LoadDefaults(const ControllerInterface& ciface) override;
 
 private:
-  ControllerEmu::Buttons* m_keys[NUM_HOTKEY_GROUPS];
+  std::array<ControllerEmu::Buttons*, NUM_HOTKEY_GROUPS> m_keys;
   std::array<ControllerEmu::ControlGroup*, NUM_HOTKEY_GROUPS> m_hotkey_groups;
 };
 

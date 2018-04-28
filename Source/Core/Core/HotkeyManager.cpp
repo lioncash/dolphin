@@ -20,7 +20,7 @@
 #include "InputCommon/GCPadStatus.h"
 
 // clang-format off
-const std::string hotkey_labels[] = {
+const std::array<std::string, NUM_HOTKEYS> s_hotkey_labels{{
     _trans("Open"),
     _trans("Change Disc"),
     _trans("Eject Disc"),
@@ -154,14 +154,12 @@ const std::string hotkey_labels[] = {
     _trans("Undo Save State"),
     _trans("Save State"),
     _trans("Load State"),
-};
+}};
 // clang-format on
-static_assert(NUM_HOTKEYS == sizeof(hotkey_labels) / sizeof(hotkey_labels[0]),
-              "Wrong count of hotkey_labels");
 
 namespace HotkeyManagerEmu
 {
-static u32 s_hotkeyDown[NUM_HOTKEY_GROUPS];
+static std::array<u32, NUM_HOTKEY_GROUPS> s_hotkey_down;
 static HotkeyStatus s_hotkey;
 static bool s_enabled;
 
@@ -195,14 +193,14 @@ bool IsPressed(int id, bool held)
       static_cast<HotkeyManager*>(s_config.GetController(0))->GetIndexForGroup(group, id);
   if (s_hotkey.button[group] & (1 << group_key))
   {
-    bool pressed = !!(s_hotkeyDown[group] & (1 << group_key));
-    s_hotkeyDown[group] |= (1 << group_key);
+    bool pressed = !!(s_hotkey_down[group] & (1 << group_key));
+    s_hotkey_down[group] |= (1 << group_key);
     if (!pressed || held)
       return true;
   }
   else
   {
-    s_hotkeyDown[group] &= ~(1 << group_key);
+    s_hotkey_down[group] &= ~(1 << group_key);
   }
 
   return false;
@@ -218,9 +216,7 @@ void Initialize()
   // load the saved controller config
   s_config.LoadConfig(true);
 
-  for (u32& key : s_hotkeyDown)
-    key = 0;
-
+  s_hotkey_down = {};
   s_enabled = true;
 }
 
@@ -271,7 +267,7 @@ HotkeyManager::HotkeyManager()
     for (int key = groups_info[group].first; key <= groups_info[group].last; key++)
     {
       m_keys[group]->controls.emplace_back(
-          new ControllerEmu::Input(ControllerEmu::Translate, hotkey_labels[key]));
+          new ControllerEmu::Input(ControllerEmu::Translate, s_hotkey_labels[key]));
     }
   }
 }
