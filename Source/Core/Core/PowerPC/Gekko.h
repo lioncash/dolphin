@@ -325,12 +325,16 @@ union UGQR
   UGQR(u32 hex_) : Hex{hex_} {}
 };
 
-#define XER_CA_SHIFT 29
-#define XER_OV_SHIFT 30
-#define XER_SO_SHIFT 31
-#define XER_OV_MASK 1
-#define XER_SO_MASK 2
 // XER
+enum : u8
+{
+  XER_CA_SHIFT = 29,
+  XER_OV_SHIFT = 30,
+  XER_SO_SHIFT = 31,
+  XER_OV_MASK = 1,
+  XER_SO_MASK = 2
+};
+
 union UReg_XER
 {
   struct
@@ -381,8 +385,11 @@ union UReg_MSR
   explicit UReg_MSR(u32 hex_) : Hex{hex_} {}
 };
 
-#define FPRF_SHIFT 12
-#define FPRF_MASK (0x1F << FPRF_SHIFT)
+enum : u32
+{
+  FPRF_SHIFT = 12,
+  FPRF_MASK = 0x1F << FPRF_SHIFT
+};
 
 // FPSCR exception flags
 enum FPSCRExceptionFlag : u32
