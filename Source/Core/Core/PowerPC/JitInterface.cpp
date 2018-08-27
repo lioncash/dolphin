@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <unordered_set>
 
@@ -119,8 +120,12 @@ std::optional<Profiler::ProfileStats> GetProfileResults()
   if (old_state == Core::State::Running)
     Core::SetState(Core::State::Paused);
 
+  LARGE_INTEGER counts_per_sec{};
+  QueryPerformanceFrequency(&counts_per_sec);
+
   Profiler::ProfileStats prof_stats;
-  QueryPerformanceFrequency((LARGE_INTEGER*)&prof_stats.countsPerSec);
+  std::memcpy(&prof_stats.countsPerSec, &counts_per_sec, sizeof(counts_per_sec));
+
   g_jit->GetBlockCache()->RunOnBlocks([&prof_stats](const JitBlock& block) {
     const auto& data = block.profile_data;
     u64 cost = data.downcountCounter;
