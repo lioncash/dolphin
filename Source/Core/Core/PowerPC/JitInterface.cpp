@@ -81,8 +81,12 @@ CPUCoreBase* GetCore()
 
 void WriteProfileResults(const std::string& filename)
 {
-  Profiler::ProfileStats prof_stats;
-  GetProfileResults(&prof_stats);
+  const auto prof_stats = GetProfileResults();
+  if (!prof_stats)
+  {
+    PanicAlert("Attempted to get profile stats without a valid JIT instance.");
+    return;
+  }
 
   File::IOFile f(filename, "w");
   if (!f)
@@ -90,50 +94,50 @@ void WriteProfileResults(const std::string& filename)
     PanicAlert("Failed to open %s", filename.c_str());
     return;
   }
+
   fprintf(f.GetHandle(), "origAddr\tblkName\trunCount\tcost\ttimeCost\tpercent\ttimePercent\tOvAlli"
                          "nBlkTime(ms)\tblkCodeSize\n");
-  for (auto& stat : prof_stats.block_stats)
+  for (const auto& stat : prof_stats->block_stats)
   {
     std::string name = g_symbolDB.GetDescription(stat.addr);
-    double percent = 100.0 * (double)stat.cost / (double)prof_stats.cost_sum;
-    double timePercent = 100.0 * (double)stat.tick_counter / (double)prof_stats.timecost_sum;
+    double percent = 100.0 * (double)stat.cost / (double)prof_stats->cost_sum;
+    double timePercent = 100.0 * (double)stat.tick_counter / (double)prof_stats->timecost_sum;
     fprintf(f.GetHandle(),
             "%08x\t%s\t%" PRIu64 "\t%" PRIu64 "\t%" PRIu64 "\t%.2f\t%.2f\t%.2f\t%i\n", stat.addr,
             name.c_str(), stat.run_count, stat.cost, stat.tick_counter, percent, timePercent,
-            (double)stat.tick_counter * 1000.0 / (double)prof_stats.countsPerSec, stat.block_size);
+            (double)stat.tick_counter * 1000.0 / (double)prof_stats->countsPerSec, stat.block_size);
   }
 }
 
-void GetProfileResults(Profiler::ProfileStats* prof_stats)
+std::optional<Profiler::ProfileStats> GetProfileResults()
 {
   // Can't really do this with no g_jit core available
   if (!g_jit)
-    return;
+    return {};
 
-  prof_stats->cost_sum = 0;
-  prof_stats->timecost_sum = 0;
-  prof_stats->block_stats.clear();
-
-  Core::State old_state = Core::GetState();
+  const Core::State old_state = Core::GetState();
   if (old_state == Core::State::Running)
     Core::SetState(Core::State::Paused);
 
-  QueryPerformanceFrequency((LARGE_INTEGER*)&prof_stats->countsPerSec);
+  Profiler::ProfileStats prof_stats;
+  QueryPerformanceFrequency((LARGE_INTEGER*)&prof_stats.countsPerSec);
   g_jit->GetBlockCache()->RunOnBlocks([&prof_stats](const JitBlock& block) {
     const auto& data = block.profile_data;
     u64 cost = data.downcountCounter;
     u64 timecost = data.ticCounter;
     // Todo: tweak.
     if (data.runCount >= 1)
-      prof_stats->block_stats.emplace_back(block.effectiveAddress, cost, timecost, data.runCount,
-                                           block.codeSize);
-    prof_stats->cost_sum += cost;
-    prof_stats->timecost_sum += timecost;
+      prof_stats.block_stats.emplace_back(block.effectiveAddress, cost, timecost, data.runCount,
+                                          block.codeSize);
+    prof_stats.cost_sum += cost;
+    prof_stats.timecost_sum += timecost;
   });
 
-  sort(prof_stats->block_stats.begin(), prof_stats->block_stats.end());
+  std::sort(prof_stats.block_stats.begin(), prof_stats.block_stats.end());
   if (old_state == Core::State::Running)
     Core::SetState(Core::State::Running);
+
+  return prof_stats;
 }
 
 int GetHostCode(u32* address, const u8** code, u32* code_size)

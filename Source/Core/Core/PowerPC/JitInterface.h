@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "Common/CommonTypes.h"
@@ -38,7 +39,7 @@ CPUCoreBase* GetCore();
 
 // Debugging
 void WriteProfileResults(const std::string& filename);
-void GetProfileResults(Profiler::ProfileStats* prof_stats);
+std::optional<Profiler::ProfileStats> GetProfileResults();
 int GetHostCode(u32* address, const u8** code, u32* code_size);
 
 // Memory Utilities
