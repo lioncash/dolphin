@@ -46,8 +46,8 @@ private:
   void FixChecksums();
   void DrawIcons();
 
-  QPixmap GetBannerFromSaveFile(int file_index, int slot);
-  std::vector<QPixmap> GetIconFromSaveFile(int file_index, int slot);
+  QPixmap GetBannerFromSaveFile(int file_index, int slot) const;
+  std::vector<QPixmap> GetIconFromSaveFile(int file_index, int slot) const;
 
   // Actions
   QPushButton* m_select_button;

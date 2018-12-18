@@ -438,9 +438,9 @@ void GCMemcardManager::DrawIcons()
   }
 }
 
-QPixmap GCMemcardManager::GetBannerFromSaveFile(int file_index, int slot)
+QPixmap GCMemcardManager::GetBannerFromSaveFile(int file_index, int slot) const
 {
-  auto& memcard = m_slot_memcard[slot];
+  const auto& memcard = m_slot_memcard[slot];
 
   std::vector<u32> pxdata(BANNER_WIDTH * IMAGE_HEIGHT);
 
@@ -454,9 +454,9 @@ QPixmap GCMemcardManager::GetBannerFromSaveFile(int file_index, int slot)
   return QPixmap::fromImage(image);
 }
 
-std::vector<QPixmap> GCMemcardManager::GetIconFromSaveFile(int file_index, int slot)
+std::vector<QPixmap> GCMemcardManager::GetIconFromSaveFile(int file_index, int slot) const
 {
-  auto& memcard = m_slot_memcard[slot];
+  const auto& memcard = m_slot_memcard[slot];
 
   std::vector<u32> pxdata(BANNER_WIDTH * IMAGE_HEIGHT);
   std::vector<u8> anim_delay(ANIM_MAX_FRAMES);
