@@ -96,8 +96,6 @@ private:
   void GameStatusChanged(bool running);
   void SetOptionsEnabled(bool enabled);
 
-  void SetGame(const QString& game_path);
-
   void SendMessage(const std::string& message);
 
   // Chat
