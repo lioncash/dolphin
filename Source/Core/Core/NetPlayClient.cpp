@@ -191,7 +191,6 @@ NetPlayClient::NetPlayClient(const std::string& address, const u16 port, NetPlay
 
       while (enet_host_service(m_client, &netEvent, 4) > 0)
       {
-        sf::Packet rpac;
         switch (netEvent.type)
         {
         case ENET_EVENT_TYPE_CONNECT:
