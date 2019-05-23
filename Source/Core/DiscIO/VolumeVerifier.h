@@ -32,7 +32,6 @@
 namespace IOS::ES
 {
 struct Content;
-class SignedBlobReader;
 }  // namespace IOS::ES
 
 namespace DiscIO
