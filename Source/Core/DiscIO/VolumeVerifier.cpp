@@ -821,10 +821,10 @@ void VolumeVerifier::Finish()
     if (pair.second > 0)
     {
       const std::string name = GetPartitionName(m_volume.GetPartitionType(pair.first));
-      const std::string text = StringFromFormat(
+      std::string text = StringFromFormat(
           GetStringT("Errors were found in %zu blocks in the %s partition.").c_str(), pair.second,
           name.c_str());
-      AddProblem(Severity::Medium, text);
+      AddProblem(Severity::Medium, std::move(text));
     }
   }
 
@@ -833,10 +833,10 @@ void VolumeVerifier::Finish()
     if (pair.second > 0)
     {
       const std::string name = GetPartitionName(m_volume.GetPartitionType(pair.first));
-      const std::string text = StringFromFormat(
+      std::string text = StringFromFormat(
           GetStringT("Errors were found in %zu unused blocks in the %s partition.").c_str(),
           pair.second, name.c_str());
-      AddProblem(Severity::Low, text);
+      AddProblem(Severity::Low, std::move(text));
     }
   }
 
@@ -906,9 +906,9 @@ const VolumeVerifier::Result& VolumeVerifier::GetResult() const
   return m_result;
 }
 
-void VolumeVerifier::AddProblem(Severity severity, const std::string& text)
+void VolumeVerifier::AddProblem(Severity severity, std::string text)
 {
-  m_result.problems.emplace_back(Problem{severity, text});
+  m_result.problems.emplace_back(Problem{severity, std::move(text)});
 }
 
 }  // namespace DiscIO

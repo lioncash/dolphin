@@ -104,7 +104,7 @@ private:
   void SetUpHashing();
   bool CheckContentIntegrity(const IOS::ES::Content& content);
 
-  void AddProblem(Severity severity, const std::string& text);
+  void AddProblem(Severity severity, std::string text);
 
   const Volume& m_volume;
   Result m_result;
