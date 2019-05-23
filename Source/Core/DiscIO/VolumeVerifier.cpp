@@ -732,23 +732,27 @@ void VolumeVerifier::Process()
     m_content_index++;
   }
 
-  while (m_block_index < m_blocks.size() && m_blocks[m_block_index].offset < m_progress)
+  while (m_block_index < m_blocks.size())
   {
-    if (!m_volume.CheckBlockIntegrity(m_blocks[m_block_index].block_index,
-                                      m_blocks[m_block_index].partition))
+    const auto& block = m_blocks[m_block_index];
+    if (block.offset >= m_progress)
+      break;
+
+    if (!m_volume.CheckBlockIntegrity(block.block_index, block.partition))
     {
-      const u64 offset = m_blocks[m_block_index].offset;
+      const u64 offset = block.offset;
       if (m_scrubber.CanBlockBeScrubbed(offset))
       {
         WARN_LOG(DISCIO, "Integrity check failed for unused block at 0x%" PRIx64, offset);
-        m_unused_block_errors[m_blocks[m_block_index].partition]++;
+        m_unused_block_errors[block.partition]++;
       }
       else
       {
         WARN_LOG(DISCIO, "Integrity check failed for block at 0x%" PRIx64, offset);
-        m_block_errors[m_blocks[m_block_index].partition]++;
+        m_block_errors[block.partition]++;
       }
     }
+
     m_block_index++;
   }
 }
