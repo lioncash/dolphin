@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <string>
+#include <type_traits>
 
 #include "Common/CommonTypes.h"
 
@@ -38,6 +39,9 @@ public:
   template <typename T>
   bool ReadArray(T* elements, size_t count, size_t* num_read = nullptr)
   {
+    static_assert(std::is_trivially_copyable_v<T>,
+                  "ReadArray may only be used with trivially copyable types.");
+
     size_t read_count = 0;
     if (!IsOpen() || count != (read_count = std::fread(elements, sizeof(T), count, m_file)))
       m_good = false;
@@ -51,6 +55,9 @@ public:
   template <typename T>
   bool WriteArray(const T* elements, size_t count)
   {
+    static_assert(std::is_trivially_copyable_v<T>,
+                  "WriteArray may only be used with trivially copyable types.");
+
     if (!IsOpen() || count != std::fwrite(elements, sizeof(T), count, m_file))
       m_good = false;
 
