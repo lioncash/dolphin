@@ -21,15 +21,13 @@
 
 namespace File
 {
-IOFile::IOFile() : m_file(nullptr), m_good(true)
+IOFile::IOFile() = default;
+
+IOFile::IOFile(std::FILE* file) : m_file(file)
 {
 }
 
-IOFile::IOFile(std::FILE* file) : m_file(file), m_good(true)
-{
-}
-
-IOFile::IOFile(const std::string& filename, const char openmode[]) : m_file(nullptr), m_good(true)
+IOFile::IOFile(const std::string& filename, const char openmode[])
 {
   Open(filename, openmode);
 }
@@ -39,7 +37,7 @@ IOFile::~IOFile()
   Close();
 }
 
-IOFile::IOFile(IOFile&& other) noexcept : m_file(nullptr), m_good(true)
+IOFile::IOFile(IOFile&& other) noexcept
 {
   Swap(other);
 }

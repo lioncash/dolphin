@@ -88,8 +88,8 @@ public:
   }
 
 private:
-  std::FILE* m_file;
-  bool m_good;
+  std::FILE* m_file = nullptr;
+  bool m_good = true;
 };
 
 }  // namespace File
