@@ -5,9 +5,9 @@
 #include "Core/DSP/DSPHost.h"
 
 #include <string>
+#include <utility>
 
 #include "Common/CommonTypes.h"
-#include "Common/Hash.h"
 #include "Common/Logging/Log.h"
 #include "Core/ConfigManager.h"
 #include "Core/DSP/DSPAnalyzer.h"
@@ -36,9 +36,9 @@ void WriteHostMemory(u8 value, u32 addr)
   DSP::WriteARAM(value, addr);
 }
 
-void OSD_AddMessage(const std::string& str, u32 ms)
+void OSD_AddMessage(std::string str, u32 ms)
 {
-  OSD::AddMessage(str, ms);
+  OSD::AddMessage(std::move(str), ms);
 }
 
 bool OnThread()
