@@ -2,21 +2,20 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "VideoCommon/OnScreenDisplay.h"
+
 #include <algorithm>
-#include <list>
 #include <map>
 #include <mutex>
 #include <string>
 
-#include "imgui.h"
+#include <imgui.h>
 
 #include "Common/CommonTypes.h"
 #include "Common/StringUtil.h"
 #include "Common/Timer.h"
 
 #include "Core/ConfigManager.h"
-
-#include "VideoCommon/OnScreenDisplay.h"
 
 namespace OSD
 {
