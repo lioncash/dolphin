@@ -5,7 +5,6 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "Common/GL/GLUtil.h"
 

@@ -4,10 +4,7 @@
 
 #include "VideoBackends/OGL/VertexManager.h"
 
-#include <fstream>
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "Common/Align.h"
 #include "Common/CommonTypes.h"

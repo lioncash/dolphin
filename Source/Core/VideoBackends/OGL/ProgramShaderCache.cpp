@@ -5,7 +5,6 @@
 #include "VideoBackends/OGL/ProgramShaderCache.h"
 
 #include <atomic>
-#include <limits>
 #include <memory>
 #include <string>
 
@@ -17,10 +16,6 @@
 #include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
 #include "Common/StringUtil.h"
-#include "Common/Timer.h"
-
-#include "Core/ConfigManager.h"
-#include "Core/Host.h"
 
 #include "VideoBackends/OGL/OGLShader.h"
 #include "VideoBackends/OGL/Render.h"
@@ -28,14 +23,11 @@
 #include "VideoBackends/OGL/VertexManager.h"
 
 #include "VideoCommon/AsyncShaderCompiler.h"
-#include "VideoCommon/DriverDetails.h"
 #include "VideoCommon/GeometryShaderManager.h"
-#include "VideoCommon/ImageWrite.h"
 #include "VideoCommon/PixelShaderManager.h"
 #include "VideoCommon/Statistics.h"
 #include "VideoCommon/VertexLoaderManager.h"
 #include "VideoCommon/VertexShaderManager.h"
-#include "VideoCommon/VideoCommon.h"
 
 namespace OGL
 {

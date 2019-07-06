@@ -5,14 +5,11 @@
 #include "VideoBackends/OGL/StreamBuffer.h"
 
 #include "Common/Align.h"
-#include "Common/GL/GLUtil.h"
 #include "Common/MathUtil.h"
 #include "Common/MemoryUtil.h"
 
 #include "VideoBackends/OGL/Render.h"
-
 #include "VideoCommon/DriverDetails.h"
-#include "VideoCommon/OnScreenDisplay.h"
 
 namespace OGL
 {
