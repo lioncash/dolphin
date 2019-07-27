@@ -25,53 +25,53 @@ namespace TransformUnit
 {
 static void MultiplyVec2Mat24(const Vec3& vec, const float* mat, Vec3& result)
 {
-  result.x = mat[0] * vec.x + mat[1] * vec.y + mat[2] + mat[3];
-  result.y = mat[4] * vec.x + mat[5] * vec.y + mat[6] + mat[7];
-  result.z = 1.0f;
+  result.x() = mat[0] * vec.x() + mat[1] * vec.y() + mat[2] + mat[3];
+  result.y() = mat[4] * vec.x() + mat[5] * vec.y() + mat[6] + mat[7];
+  result.z() = 1.0f;
 }
 
 static void MultiplyVec2Mat34(const Vec3& vec, const float* mat, Vec3& result)
 {
-  result.x = mat[0] * vec.x + mat[1] * vec.y + mat[2] + mat[3];
-  result.y = mat[4] * vec.x + mat[5] * vec.y + mat[6] + mat[7];
-  result.z = mat[8] * vec.x + mat[9] * vec.y + mat[10] + mat[11];
+  result.x() = mat[0] * vec.x() + mat[1] * vec.y() + mat[2] + mat[3];
+  result.y() = mat[4] * vec.x() + mat[5] * vec.y() + mat[6] + mat[7];
+  result.z() = mat[8] * vec.x() + mat[9] * vec.y() + mat[10] + mat[11];
 }
 
 static void MultiplyVec3Mat33(const Vec3& vec, const float* mat, Vec3& result)
 {
-  result.x = mat[0] * vec.x + mat[1] * vec.y + mat[2] * vec.z;
-  result.y = mat[3] * vec.x + mat[4] * vec.y + mat[5] * vec.z;
-  result.z = mat[6] * vec.x + mat[7] * vec.y + mat[8] * vec.z;
+  result.x() = mat[0] * vec.x() + mat[1] * vec.y() + mat[2] * vec.z();
+  result.y() = mat[3] * vec.x() + mat[4] * vec.y() + mat[5] * vec.z();
+  result.z() = mat[6] * vec.x() + mat[7] * vec.y() + mat[8] * vec.z();
 }
 
 static void MultiplyVec3Mat24(const Vec3& vec, const float* mat, Vec3& result)
 {
-  result.x = mat[0] * vec.x + mat[1] * vec.y + mat[2] * vec.z + mat[3];
-  result.y = mat[4] * vec.x + mat[5] * vec.y + mat[6] * vec.z + mat[7];
-  result.z = 1.0f;
+  result.x() = mat[0] * vec.x() + mat[1] * vec.y() + mat[2] * vec.z() + mat[3];
+  result.y() = mat[4] * vec.x() + mat[5] * vec.y() + mat[6] * vec.z() + mat[7];
+  result.z() = 1.0f;
 }
 
 static void MultiplyVec3Mat34(const Vec3& vec, const float* mat, Vec3& result)
 {
-  result.x = mat[0] * vec.x + mat[1] * vec.y + mat[2] * vec.z + mat[3];
-  result.y = mat[4] * vec.x + mat[5] * vec.y + mat[6] * vec.z + mat[7];
-  result.z = mat[8] * vec.x + mat[9] * vec.y + mat[10] * vec.z + mat[11];
+  result.x() = mat[0] * vec.x() + mat[1] * vec.y() + mat[2] * vec.z() + mat[3];
+  result.y() = mat[4] * vec.x() + mat[5] * vec.y() + mat[6] * vec.z() + mat[7];
+  result.z() = mat[8] * vec.x() + mat[9] * vec.y() + mat[10] * vec.z() + mat[11];
 }
 
 static void MultipleVec3Perspective(const Vec3& vec, const Projection::Raw& proj, Vec4& result)
 {
-  result.x = proj[0] * vec.x + proj[1] * vec.z;
-  result.y = proj[2] * vec.y + proj[3] * vec.z;
+  result.x = proj[0] * vec.x() + proj[1] * vec.z();
+  result.y = proj[2] * vec.y() + proj[3] * vec.z();
   // result.z = (proj[4] * vec.z + proj[5]);
-  result.z = (proj[4] * vec.z + proj[5]) * (1.0f - (float)1e-7);
-  result.w = -vec.z;
+  result.z = (proj[4] * vec.z() + proj[5]) * (1.0f - (float)1e-7);
+  result.w = -vec.z();
 }
 
 static void MultipleVec3Ortho(const Vec3& vec, const Projection::Raw& proj, Vec4& result)
 {
-  result.x = proj[0] * vec.x + proj[1];
-  result.y = proj[2] * vec.y + proj[3];
-  result.z = proj[4] * vec.z + proj[5];
+  result.x = proj[0] * vec.x() + proj[1];
+  result.y = proj[2] * vec.y() + proj[3];
+  result.z = proj[4] * vec.z() + proj[5];
   result.w = 1;
 }
 
@@ -129,9 +129,9 @@ static void TransformTexCoordRegular(const TexMtxInfo& texinfo, int coordNum, bo
     break;
   default:
     ASSERT(texinfo.sourcerow >= XF_SRCTEX0_INROW && texinfo.sourcerow <= XF_SRCTEX7_INROW);
-    src.x = srcVertex->texCoords[texinfo.sourcerow - XF_SRCTEX0_INROW][0];
-    src.y = srcVertex->texCoords[texinfo.sourcerow - XF_SRCTEX0_INROW][1];
-    src.z = 1.0f;
+    src.x() = srcVertex->texCoords[texinfo.sourcerow - XF_SRCTEX0_INROW][0];
+    src.y() = srcVertex->texCoords[texinfo.sourcerow - XF_SRCTEX0_INROW][1];
+    src.z() = 1.0f;
     break;
   }
 
@@ -168,12 +168,12 @@ static void TransformTexCoordRegular(const TexMtxInfo& texinfo, int coordNum, bo
       // no normalization
       // q of input is 1
       // q of output is unknown
-      tempCoord.x = dst->x;
-      tempCoord.y = dst->y;
+      tempCoord.x() = dst->x();
+      tempCoord.y() = dst->y();
 
-      dst->x = postMat[0] * tempCoord.x + postMat[1] * tempCoord.y + postMat[2] + postMat[3];
-      dst->y = postMat[4] * tempCoord.x + postMat[5] * tempCoord.y + postMat[6] + postMat[7];
-      dst->z = 1.0f;
+      dst->x() = postMat[0] * tempCoord.x() + postMat[1] * tempCoord.y() + postMat[2] + postMat[3];
+      dst->y() = postMat[4] * tempCoord.x() + postMat[5] * tempCoord.y() + postMat[6] + postMat[7];
+      dst->z() = 1.0f;
     }
     else
     {
@@ -189,10 +189,10 @@ static void TransformTexCoordRegular(const TexMtxInfo& texinfo, int coordNum, bo
   // When q is 0, the GameCube appears to have a special case
   // This can be seen in devkitPro's neheGX Lesson08 example for Wii
   // Makes differences in Rogue Squadron 3 (Hoth sky) and The Last Story (shadow culling)
-  if (dst->z == 0.0f)
+  if (dst->z() == 0.0f)
   {
-    dst->x = std::clamp(dst->x / 2.0f, -1.0f, 1.0f);
-    dst->y = std::clamp(dst->y / 2.0f, -1.0f, 1.0f);
+    dst->x() = std::clamp(dst->x() / 2.0f, -1.0f, 1.0f);
+    dst->y() = std::clamp(dst->y() / 2.0f, -1.0f, 1.0f);
   }
 }
 
@@ -206,14 +206,14 @@ struct LightPointer
   Vec3 dir;
 };
 
-static inline void AddScaledIntegerColor(const u8* src, float scale, Vec3& dst)
+static void AddScaledIntegerColor(const u8* src, float scale, Vec3& dst)
 {
-  dst.x += src[1] * scale;
-  dst.y += src[2] * scale;
-  dst.z += src[3] * scale;
+  dst.x() += src[1] * scale;
+  dst.y() += src[2] * scale;
+  dst.z() += src[3] * scale;
 }
 
-static inline float SafeDivide(float n, float d)
+static float SafeDivide(float n, float d)
 {
   return (d == 0) ? (n > 0 ? 1 : 0) : n / d;
 }
@@ -249,13 +249,15 @@ static float CalculateLightAttn(const LightPointer* light, Vec3* _ldir, const Ve
   }
   case LIGHTATTN_SPOT:
   {
-    float dist2 = ldir.Length2();
-    float dist = sqrtf(dist2);
+    const float dist2 = ldir.Length2();
+    const float dist = sqrtf(dist2);
     ldir = ldir / dist;
     attn = std::max(0.0f, ldir * light->dir);
 
-    float cosAtt = light->cosatt.x + (light->cosatt.y * attn) + (light->cosatt.z * attn * attn);
-    float distAtt = light->distatt.x + (light->distatt.y * dist) + (light->distatt.z * dist2);
+    const float cosAtt =
+        light->cosatt.x() + (light->cosatt.y() * attn) + (light->cosatt.z() * attn * attn);
+    const float distAtt =
+        light->distatt.x() + (light->distatt.y() * dist) + (light->distatt.z() * dist2);
     attn = SafeDivide(std::max(0.0f, cosAtt), distAtt);
     break;
   }
@@ -339,16 +341,16 @@ void TransformColor(const InputVertexData* src, OutputVertexData* dst)
       if (colorchan.ambsource)
       {
         // vertex
-        lightCol.x = src->color[chan][1];
-        lightCol.y = src->color[chan][2];
-        lightCol.z = src->color[chan][3];
+        lightCol.x() = src->color[chan][1];
+        lightCol.y() = src->color[chan][2];
+        lightCol.z() = src->color[chan][3];
       }
       else
       {
         const u8* ambColor = reinterpret_cast<u8*>(&xfmem.ambColor[chan]);
-        lightCol.x = ambColor[1];
-        lightCol.y = ambColor[2];
-        lightCol.z = ambColor[3];
+        lightCol.x() = ambColor[1];
+        lightCol.y() = ambColor[2];
+        lightCol.z() = ambColor[3];
       }
 
       u8 mask = colorchan.GetFullLightMask();
@@ -358,9 +360,9 @@ void TransformColor(const InputVertexData* src, OutputVertexData* dst)
           LightColor(dst->mvPosition, dst->normal[0], i, colorchan, lightCol);
       }
 
-      int light_x = std::clamp(static_cast<int>(lightCol.x), 0, 255);
-      int light_y = std::clamp(static_cast<int>(lightCol.y), 0, 255);
-      int light_z = std::clamp(static_cast<int>(lightCol.z), 0, 255);
+      int light_x = std::clamp(static_cast<int>(lightCol.x()), 0, 255);
+      int light_y = std::clamp(static_cast<int>(lightCol.y()), 0, 255);
+      int light_z = std::clamp(static_cast<int>(lightCol.z()), 0, 255);
       chancolor[1] = (matcolor[1] * (light_x + (light_x >> 7))) >> 8;
       chancolor[2] = (matcolor[2] * (light_y + (light_y >> 7))) >> 8;
       chancolor[3] = (matcolor[3] * (light_z + (light_z >> 7))) >> 8;
@@ -425,24 +427,24 @@ void TransformTexCoord(const InputVertexData* src, OutputVertexData* dst, bool s
       float d1 = ldir * dst->normal[1];
       float d2 = ldir * dst->normal[2];
 
-      dst->texCoords[coordNum].x = dst->texCoords[texinfo.embosssourceshift].x + d1;
-      dst->texCoords[coordNum].y = dst->texCoords[texinfo.embosssourceshift].y + d2;
-      dst->texCoords[coordNum].z = dst->texCoords[texinfo.embosssourceshift].z;
+      dst->texCoords[coordNum].x() = dst->texCoords[texinfo.embosssourceshift].x() + d1;
+      dst->texCoords[coordNum].y() = dst->texCoords[texinfo.embosssourceshift].y() + d2;
+      dst->texCoords[coordNum].z() = dst->texCoords[texinfo.embosssourceshift].z();
     }
     break;
     case XF_TEXGEN_COLOR_STRGBC0:
       ASSERT(texinfo.sourcerow == XF_SRCCOLORS_INROW);
       ASSERT(texinfo.inputform == XF_TEXINPUT_AB11);
-      dst->texCoords[coordNum].x = (float)dst->color[0][0] / 255.0f;
-      dst->texCoords[coordNum].y = (float)dst->color[0][1] / 255.0f;
-      dst->texCoords[coordNum].z = 1.0f;
+      dst->texCoords[coordNum].x() = (float)dst->color[0][0] / 255.0f;
+      dst->texCoords[coordNum].y() = (float)dst->color[0][1] / 255.0f;
+      dst->texCoords[coordNum].z() = 1.0f;
       break;
     case XF_TEXGEN_COLOR_STRGBC1:
       ASSERT(texinfo.sourcerow == XF_SRCCOLORS_INROW);
       ASSERT(texinfo.inputform == XF_TEXINPUT_AB11);
-      dst->texCoords[coordNum].x = (float)dst->color[1][0] / 255.0f;
-      dst->texCoords[coordNum].y = (float)dst->color[1][1] / 255.0f;
-      dst->texCoords[coordNum].z = 1.0f;
+      dst->texCoords[coordNum].x() = (float)dst->color[1][0] / 255.0f;
+      dst->texCoords[coordNum].y() = (float)dst->color[1][1] / 255.0f;
+      dst->texCoords[coordNum].z() = 1.0f;
       break;
     default:
       ERROR_LOG(VIDEO, "Bad tex gen type %i", texinfo.texgentype.Value());

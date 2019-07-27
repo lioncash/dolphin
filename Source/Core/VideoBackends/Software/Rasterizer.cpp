@@ -336,17 +336,20 @@ void DrawTriangleFrontFace(const OutputVertexData* v0, const OutputVertexData* v
     return;
 
   // Setup slopes
-  float fltx1 = v0->screenPosition.x;
-  float flty1 = v0->screenPosition.y;
-  float fltdx31 = v2->screenPosition.x - fltx1;
-  float fltdx12 = fltx1 - v1->screenPosition.x;
-  float fltdy12 = flty1 - v1->screenPosition.y;
-  float fltdy31 = v2->screenPosition.y - flty1;
+  const float fltx1 = v0->screenPosition.x();
+  const float flty1 = v0->screenPosition.y();
+  const float fltdx31 = v2->screenPosition.x() - fltx1;
+  const float fltdx12 = fltx1 - v1->screenPosition.x();
+  const float fltdy12 = flty1 - v1->screenPosition.y();
+  const float fltdy31 = v2->screenPosition.y() - flty1;
 
   InitTriangle(fltx1, flty1, (X1 + 0xF) >> 4, (Y1 + 0xF) >> 4);
 
-  float w[3] = {1.0f / v0->projectedPosition.w, 1.0f / v1->projectedPosition.w,
-                1.0f / v2->projectedPosition.w};
+  const float w[3] = {
+      1.0f / v0->projectedPosition.w,
+      1.0f / v1->projectedPosition.w,
+      1.0f / v2->projectedPosition.w,
+  };
   InitSlope(&WSlope, w[0], w[1], w[2], fltdx31, fltdx12, fltdy12, fltdy31);
 
   // TODO: The zfreeze emulation is not quite correct, yet!
@@ -356,21 +359,27 @@ void DrawTriangleFrontFace(const OutputVertexData* v0, const OutputVertexData* v
   // We're currently sloppy at this since we abort early if any of the culling/clipping/scissoring
   // tests fail.
   if (!bpmem.genMode.zfreeze || !g_ActiveConfig.bZFreeze)
+  {
     InitSlope(&ZSlope, v0->screenPosition[2], v1->screenPosition[2], v2->screenPosition[2], fltdx31,
               fltdx12, fltdy12, fltdy31);
+  }
 
   for (unsigned int i = 0; i < bpmem.genMode.numcolchans; i++)
   {
     for (int comp = 0; comp < 4; comp++)
+    {
       InitSlope(&ColorSlopes[i][comp], v0->color[i][comp], v1->color[i][comp], v2->color[i][comp],
                 fltdx31, fltdx12, fltdy12, fltdy31);
+    }
   }
 
   for (unsigned int i = 0; i < bpmem.genMode.numtexgens; i++)
   {
     for (int comp = 0; comp < 3; comp++)
+    {
       InitSlope(&TexSlopes[i][comp], v0->texCoords[i][comp] * w[0], v1->texCoords[i][comp] * w[1],
                 v2->texCoords[i][comp] * w[2], fltdx31, fltdx12, fltdy12, fltdy31);
+    }
   }
 
   // Half-edge constants

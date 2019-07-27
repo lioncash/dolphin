@@ -334,9 +334,9 @@ void ProcessTriangle(OutputVertexData* v0, OutputVertexData* v1, OutputVertexDat
 static void CopyVertex(OutputVertexData* dst, const OutputVertexData* src, float dx, float dy,
                        unsigned int sOffset)
 {
-  dst->screenPosition.x = src->screenPosition.x + dx;
-  dst->screenPosition.y = src->screenPosition.y + dy;
-  dst->screenPosition.z = src->screenPosition.z;
+  dst->screenPosition.x() = src->screenPosition.x() + dx;
+  dst->screenPosition.y() = src->screenPosition.y() + dy;
+  dst->screenPosition.z() = src->screenPosition.z();
 
   dst->normal = src->normal;
   dst->color = src->color;
@@ -365,8 +365,8 @@ void ProcessLine(OutputVertexData* lineV0, OutputVertexData* lineV1)
     PerspectiveDivide(v0);
     PerspectiveDivide(v1);
 
-    float dx = v1->screenPosition.x - v0->screenPosition.x;
-    float dy = v1->screenPosition.y - v0->screenPosition.y;
+    const float dx = v1->screenPosition.x() - v0->screenPosition.x();
+    const float dy = v1->screenPosition.y() - v0->screenPosition.y();
 
     float screenDx = 0;
     float screenDy = 0;
@@ -445,12 +445,12 @@ bool CullTest(const OutputVertexData* v0, const OutputVertexData* v1, const Outp
 
 void PerspectiveDivide(OutputVertexData* vertex)
 {
-  Vec4& projected = vertex->projectedPosition;
+  const Vec4& projected = vertex->projectedPosition;
   Vec3& screen = vertex->screenPosition;
 
-  float wInverse = 1.0f / projected.w;
-  screen.x = projected.x * wInverse * xfmem.viewport.wd + xfmem.viewport.xOrig - 342;
-  screen.y = projected.y * wInverse * xfmem.viewport.ht + xfmem.viewport.yOrig - 342;
-  screen.z = projected.z * wInverse * xfmem.viewport.zRange + xfmem.viewport.farZ;
+  const float wInverse = 1.0f / projected.w;
+  screen.x() = projected.x * wInverse * xfmem.viewport.wd + xfmem.viewport.xOrig - 342;
+  screen.y() = projected.y * wInverse * xfmem.viewport.ht + xfmem.viewport.yOrig - 342;
+  screen.z() = projected.z * wInverse * xfmem.viewport.zRange + xfmem.viewport.farZ;
 }
 }  // namespace Clipper
