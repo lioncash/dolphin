@@ -20,13 +20,13 @@ struct Vec4
 
 struct InputVertexData
 {
-  u8 posMtx;
-  std::array<u8, 8> texMtx;
+  u8 posMtx = 0;
+  std::array<u8, 8> texMtx{};
 
-  Vec3 position;
-  std::array<Vec3, 3> normal;
-  std::array<std::array<u8, 4>, 2> color;
-  std::array<std::array<float, 2>, 8> texCoords;
+  Vec3 position{};
+  std::array<Vec3, 3> normal{};
+  std::array<std::array<u8, 4>, 2> color{};
+  std::array<std::array<float, 2>, 8> texCoords{};
 };
 
 struct OutputVertexData
