@@ -17,31 +17,31 @@ namespace
 {
 using namespace ciface::Core;
 
-enum TokenType
+enum class TokenType
 {
-  TOK_DISCARD,
-  TOK_INVALID,
-  TOK_EOF,
-  TOK_LPAREN,
-  TOK_RPAREN,
-  TOK_AND,
-  TOK_OR,
-  TOK_NOT,
-  TOK_ADD,
-  TOK_CONTROL,
+  Discard,
+  Invalid,
+  EndOfFile,
+  LeftParenthesis,
+  RightParenthesis,
+  AND,
+  OR,
+  NOT,
+  Add,
+  Control,
 };
 
 std::string OpName(TokenType op)
 {
   switch (op)
   {
-  case TOK_AND:
+  case TokenType::AND:
     return "And";
-  case TOK_OR:
+  case TokenType::OR:
     return "Or";
-  case TOK_NOT:
+  case TokenType::NOT:
     return "Not";
-  case TOK_ADD:
+  case TokenType::Add:
     return "Add";
   default:
     assert(false);
@@ -64,25 +64,25 @@ public:
   {
     switch (type)
     {
-    case TOK_DISCARD:
+    case TokenType::Discard:
       return "Discard";
-    case TOK_EOF:
+    case TokenType::EndOfFile:
       return "EOF";
-    case TOK_LPAREN:
+    case TokenType::LeftParenthesis:
       return "(";
-    case TOK_RPAREN:
+    case TokenType::RightParenthesis:
       return ")";
-    case TOK_AND:
+    case TokenType::AND:
       return "&";
-    case TOK_OR:
+    case TokenType::OR:
       return "|";
-    case TOK_NOT:
+    case TokenType::NOT:
       return "!";
-    case TOK_ADD:
+    case TokenType::Add:
       return "+";
-    case TOK_CONTROL:
+    case TokenType::Control:
       return std::string("Device(").append(std::string(qualifier)).append(1, ')');
-    case TOK_INVALID:
+    case TokenType::Invalid:
       break;
     }
 
@@ -127,7 +127,7 @@ public:
 
     qualifier.SetControlName(std::move(value));
 
-    return Token(TOK_CONTROL, std::move(qualifier));
+    return Token(TokenType::Control, std::move(qualifier));
   }
 
   Token GetBarewordsControl(char c)
@@ -146,13 +146,13 @@ public:
 
     ControlQualifier qualifier;
     qualifier.SetControlName(std::move(name));
-    return Token(TOK_CONTROL, std::move(qualifier));
+    return Token(TokenType::Control, std::move(qualifier));
   }
 
   Token NextToken()
   {
     if (it == expr.end())
-      return Token(TOK_EOF);
+      return Token(TokenType::EndOfFile);
 
     char c = *it++;
     switch (c)
@@ -161,26 +161,26 @@ public:
     case '\t':
     case '\n':
     case '\r':
-      return Token(TOK_DISCARD);
+      return Token(TokenType::Discard);
     case '(':
-      return Token(TOK_LPAREN);
+      return Token(TokenType::LeftParenthesis);
     case ')':
-      return Token(TOK_RPAREN);
+      return Token(TokenType::RightParenthesis);
     case '&':
-      return Token(TOK_AND);
+      return Token(TokenType::AND);
     case '|':
-      return Token(TOK_OR);
+      return Token(TokenType::OR);
     case '!':
-      return Token(TOK_NOT);
+      return Token(TokenType::NOT);
     case '+':
-      return Token(TOK_ADD);
+      return Token(TokenType::Add);
     case '`':
       return GetFullyQualifiedControl();
     default:
       if (isalpha(c))
         return GetBarewordsControl(c);
       else
-        return Token(TOK_INVALID);
+        return Token(TokenType::Invalid);
     }
   }
 
@@ -190,10 +190,10 @@ public:
     {
       Token tok = NextToken();
 
-      if (tok.type == TOK_DISCARD)
+      if (tok.type == TokenType::Discard)
         continue;
 
-      if (tok.type == TOK_INVALID)
+      if (tok.type == TokenType::Invalid)
       {
         tokens.clear();
         return ParseStatus::SyntaxError;
@@ -201,7 +201,7 @@ public:
 
       tokens.push_back(tok);
 
-      if (tok.type == TOK_EOF)
+      if (tok.type == TokenType::EndOfFile)
         break;
     }
     return ParseStatus::Successful;
@@ -262,16 +262,16 @@ public:
 
   ControlState GetValue() const override
   {
-    ControlState lhsValue = lhs->GetValue();
-    ControlState rhsValue = rhs->GetValue();
+    const ControlState lhs_value = lhs->GetValue();
+    const ControlState rhs_value = rhs->GetValue();
     switch (op)
     {
-    case TOK_AND:
-      return std::min(lhsValue, rhsValue);
-    case TOK_OR:
-      return std::max(lhsValue, rhsValue);
-    case TOK_ADD:
-      return std::min(lhsValue + rhsValue, 1.0);
+    case TokenType::AND:
+      return std::min(lhs_value, rhs_value);
+    case TokenType::OR:
+      return std::max(lhs_value, rhs_value);
+    case TokenType::Add:
+      return std::min(lhs_value + rhs_value, 1.0);
     default:
       assert(false);
       return 0;
@@ -320,10 +320,10 @@ public:
   }
   ControlState GetValue() const override
   {
-    ControlState value = inner->GetValue();
+    const ControlState value = inner->GetValue();
     switch (op)
     {
-    case TOK_NOT:
+    case TokenType::NOT:
       return 1.0 - value;
     default:
       assert(false);
@@ -335,7 +335,7 @@ public:
   {
     switch (op)
     {
-    case TOK_NOT:
+    case TokenType::NOT:
       inner->SetValue(1.0 - value);
       break;
 
@@ -419,7 +419,7 @@ private:
   {
     switch (type)
     {
-    case TOK_NOT:
+    case TokenType::NOT:
       return true;
     default:
       return false;
@@ -430,9 +430,9 @@ private:
   {
     switch (type)
     {
-    case TOK_AND:
-    case TOK_OR:
-    case TOK_ADD:
+    case TokenType::AND:
+    case TokenType::OR:
+    case TokenType::Add:
       return true;
     default:
       return false;
@@ -452,10 +452,10 @@ private:
     Token tok = Chew();
     switch (tok.type)
     {
-    case TOK_CONTROL:
+    case TokenType::Control:
       return ParseResult{ParseStatus::Successful,
                          std::make_unique<ControlExpression>(tok.qualifier)};
-    case TOK_LPAREN:
+    case TokenType::LeftParenthesis:
       return Paren();
     default:
       return ParseResult{ParseStatus::SyntaxError};
@@ -507,7 +507,7 @@ private:
     if (result.status != ParseStatus::Successful)
       return result;
 
-    if (!Expects(TOK_RPAREN))
+    if (!Expects(TokenType::RightParenthesis))
     {
       return ParseResult{ParseStatus::SyntaxError};
     }
