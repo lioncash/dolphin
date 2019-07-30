@@ -415,8 +415,32 @@ private:
   std::vector<Token> tokens;
   std::vector<Token>::iterator m_it;
 
+  static bool IsUnaryExpression(TokenType type)
+  {
+    switch (type)
+    {
+    case TOK_NOT:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static bool IsBinaryToken(TokenType type)
+  {
+    switch (type)
+    {
+    case TOK_AND:
+    case TOK_OR:
+    case TOK_ADD:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   Token Chew() { return *m_it++; }
-  Token Peek() { return *m_it; }
+  Token Peek() const { return *m_it; }
   bool Expects(TokenType type)
   {
     Token tok = Chew();
@@ -438,17 +462,6 @@ private:
     }
   }
 
-  bool IsUnaryExpression(TokenType type)
-  {
-    switch (type)
-    {
-    case TOK_NOT:
-      return true;
-    default:
-      return false;
-    }
-  }
-
   ParseResult Unary()
   {
     if (IsUnaryExpression(Peek().type))
@@ -462,19 +475,6 @@ private:
     }
 
     return Atom();
-  }
-
-  bool IsBinaryToken(TokenType type)
-  {
-    switch (type)
-    {
-    case TOK_AND:
-    case TOK_OR:
-    case TOK_ADD:
-      return true;
-    default:
-      return false;
-    }
   }
 
   ParseResult Binary()
