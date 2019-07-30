@@ -2,14 +2,16 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "InputCommon/ControlReference/ExpressionParser.h"
+
 #include <algorithm>
 #include <cassert>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Common/StringUtil.h"
-#include "InputCommon/ControlReference/ExpressionParser.h"
 
 namespace ciface::ExpressionParser
 {
@@ -184,27 +186,28 @@ public:
     }
   }
 
-  ParseStatus Tokenize(std::vector<Token>& tokens)
+  std::pair<ParseStatus, std::vector<Token>> Tokenize()
   {
+    std::vector<Token> tokens;
+
     while (true)
     {
-      Token tok = NextToken();
+      Token token = NextToken();
+      const auto token_type = token.type;
 
-      if (tok.type == TokenType::Discard)
+      if (token_type == TokenType::Discard)
         continue;
 
-      if (tok.type == TokenType::Invalid)
-      {
-        tokens.clear();
-        return ParseStatus::SyntaxError;
-      }
+      if (token_type == TokenType::Invalid)
+        return {ParseStatus::SyntaxError, {}};
 
-      tokens.push_back(tok);
+      tokens.push_back(std::move(token));
 
-      if (tok.type == TokenType::EndOfFile)
+      if (token_type == TokenType::EndOfFile)
         break;
     }
-    return ParseStatus::Successful;
+
+    return {ParseStatus::Successful, std::move(tokens)};
   }
 };
 
@@ -521,8 +524,7 @@ private:
 ParseResult ParseComplexExpression(const std::string& str)
 {
   Lexer l(str);
-  std::vector<Token> tokens;
-  const ParseStatus tokenize_status = l.Tokenize(tokens);
+  auto [tokenize_status, tokens] = l.Tokenize();
   if (tokenize_status != ParseStatus::Successful)
     return ParseResult{tokenize_status};
 
