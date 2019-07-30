@@ -28,9 +28,11 @@ bool ControlReference::InputGateOn()
 void ControlReference::UpdateReference(const ciface::Core::DeviceContainer& devices,
                                        const ciface::Core::DeviceQualifier& default_device)
 {
-  ControlFinder finder(devices, default_device, IsInput());
-  if (m_parsed_expression)
-    m_parsed_expression->UpdateReferences(finder);
+  if (!m_parsed_expression)
+    return;
+
+  const ControlFinder finder(devices, default_device, IsInput());
+  m_parsed_expression->UpdateReferences(finder);
 }
 
 int ControlReference::BoundCount() const

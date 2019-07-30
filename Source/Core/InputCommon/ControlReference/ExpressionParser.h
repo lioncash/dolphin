@@ -51,7 +51,7 @@ public:
   virtual ControlState GetValue() const = 0;
   virtual void SetValue(ControlState state) = 0;
   virtual int CountNumControls() const = 0;
-  virtual void UpdateReferences(ControlFinder& finder) = 0;
+  virtual void UpdateReferences(const ControlFinder& finder) = 0;
   virtual explicit operator std::string() const = 0;
 };
 

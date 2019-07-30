@@ -235,7 +235,7 @@ public:
       control->ToOutput()->SetState(value);
   }
   int CountNumControls() const override { return control ? 1 : 0; }
-  void UpdateReferences(ControlFinder& finder) override
+  void UpdateReferences(const ControlFinder& finder) override
   {
     m_device = finder.FindDevice(qualifier);
     control = finder.FindControl(qualifier);
@@ -290,7 +290,7 @@ public:
     return lhs->CountNumControls() + rhs->CountNumControls();
   }
 
-  void UpdateReferences(ControlFinder& finder) override
+  void UpdateReferences(const ControlFinder& finder) override
   {
     lhs->UpdateReferences(finder);
     rhs->UpdateReferences(finder);
@@ -344,7 +344,7 @@ public:
   }
 
   int CountNumControls() const override { return inner->CountNumControls(); }
-  void UpdateReferences(ControlFinder& finder) override { inner->UpdateReferences(finder); }
+  void UpdateReferences(const ControlFinder& finder) override { inner->UpdateReferences(finder); }
   explicit operator std::string() const override
   {
     return OpName(op).append(1, '(').append(std::string(*inner)).append(1, ')');
@@ -374,7 +374,7 @@ public:
         .append(1, ')');
   }
 
-  void UpdateReferences(ControlFinder& finder) override
+  void UpdateReferences(const ControlFinder& finder) override
   {
     m_lhs->UpdateReferences(finder);
     m_rhs->UpdateReferences(finder);
