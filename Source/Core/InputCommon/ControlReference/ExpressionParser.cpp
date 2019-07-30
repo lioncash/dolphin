@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -99,35 +100,40 @@ public:
   std::string::iterator it;
 
   explicit Lexer(std::string expr_) : expr(std::move(expr_)) { it = expr.begin(); }
-  bool FetchBacktickString(std::string& value, char otherDelim = 0)
+  std::optional<std::string> FetchBacktickString(char other_delim = 0)
   {
-    value = "";
+    std::string value;
+
     while (it != expr.end())
     {
-      char c = *it;
+      const char c = *it;
       ++it;
+
       if (c == '`')
-        return false;
-      if (c > 0 && c == otherDelim)
-        return true;
+        return std::nullopt;
+
+      if (c > 0 && c == other_delim)
+        return std::make_optional(std::move(value));
+
       value += c;
     }
-    return false;
+
+    return std::nullopt;
   }
 
   Token GetFullyQualifiedControl()
   {
     ControlQualifier qualifier;
-    std::string value;
+    std::string control_name;
 
-    if (FetchBacktickString(value, ':'))
+    if (const auto device_name = FetchBacktickString(':'))
     {
       // Found colon, this is the device name
-      qualifier.SetDeviceQualifier(value);
-      FetchBacktickString(value);
+      qualifier.SetDeviceQualifier(*device_name);
+      control_name = std::move(*FetchBacktickString());
     }
 
-    qualifier.SetControlName(std::move(value));
+    qualifier.SetControlName(std::move(control_name));
 
     return Token(TokenType::Control, std::move(qualifier));
   }
