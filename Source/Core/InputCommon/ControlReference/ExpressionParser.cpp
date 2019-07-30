@@ -13,6 +13,8 @@
 
 namespace ciface::ExpressionParser
 {
+namespace
+{
 using namespace ciface::Core;
 
 enum TokenType
@@ -29,7 +31,7 @@ enum TokenType
   TOK_CONTROL,
 };
 
-inline std::string OpName(TokenType op)
+std::string OpName(TokenType op)
 {
   switch (op)
   {
@@ -389,27 +391,6 @@ private:
   std::unique_ptr<Expression> m_rhs;
 };
 
-std::shared_ptr<Device> ControlFinder::FindDevice(const ControlQualifier& qualifier) const
-{
-  if (qualifier.HasDevice())
-    return container.FindDevice(qualifier.GetDeviceQualifier());
-  else
-    return container.FindDevice(default_device);
-}
-
-Device::Control* ControlFinder::FindControl(const ControlQualifier& qualifier) const
-{
-  const std::shared_ptr<Device> device = FindDevice(qualifier);
-  if (!device)
-    return nullptr;
-
-  const auto& control_name = qualifier.GetControlName();
-  if (is_input)
-    return device->FindInput(control_name);
-  else
-    return device->FindOutput(control_name);
-}
-
 struct ParseResult
 {
   explicit ParseResult(ParseStatus status_, std::unique_ptr<Expression>&& expr_ = {})
@@ -537,7 +518,7 @@ private:
   ParseResult Toplevel() { return Binary(); }
 };
 
-static ParseResult ParseComplexExpression(const std::string& str)
+ParseResult ParseComplexExpression(const std::string& str)
 {
   Lexer l(str);
   std::vector<Token> tokens;
@@ -548,12 +529,34 @@ static ParseResult ParseComplexExpression(const std::string& str)
   return Parser(std::move(tokens)).Parse();
 }
 
-static std::unique_ptr<Expression> ParseBarewordExpression(const std::string& str)
+std::unique_ptr<Expression> ParseBarewordExpression(const std::string& str)
 {
   ControlQualifier qualifier;
   qualifier.SetControlName(str);
 
   return std::make_unique<ControlExpression>(std::move(qualifier));
+}
+}  // Anonymous namespace
+
+std::shared_ptr<Device> ControlFinder::FindDevice(const ControlQualifier& qualifier) const
+{
+  if (qualifier.HasDevice())
+    return container.FindDevice(qualifier.GetDeviceQualifier());
+  else
+    return container.FindDevice(default_device);
+}
+
+Device::Control* ControlFinder::FindControl(const ControlQualifier& qualifier) const
+{
+  const std::shared_ptr<Device> device = FindDevice(qualifier);
+  if (!device)
+    return nullptr;
+
+  const auto& control_name = qualifier.GetControlName();
+  if (is_input)
+    return device->FindInput(control_name);
+  else
+    return device->FindOutput(control_name);
 }
 
 std::pair<ParseStatus, std::unique_ptr<Expression>> ParseExpression(const std::string& str)
