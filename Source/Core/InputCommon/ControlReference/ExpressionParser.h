@@ -14,17 +14,29 @@ namespace ciface::ExpressionParser
 class ControlQualifier
 {
 public:
-  bool has_device = false;
-  Core::DeviceQualifier device_qualifier;
-  std::string control_name;
+  bool HasDevice() const { return m_has_device; }
+  const Core::DeviceQualifier& GetDeviceQualifier() const { return m_device_qualifier; }
+  void SetDeviceQualifier(const std::string& qualifier)
+  {
+    m_device_qualifier.FromString(qualifier);
+    m_has_device = true;
+  }
+
+  const std::string& GetControlName() const { return m_control_name; }
+  void SetControlName(std::string name) { m_control_name = std::move(name); }
 
   explicit operator std::string() const
   {
-    if (has_device)
-      return device_qualifier.ToString().append(1, ':').append(control_name);
+    if (m_has_device)
+      return m_device_qualifier.ToString().append(1, ':').append(m_control_name);
     else
-      return control_name;
+      return m_control_name;
   }
+
+private:
+  bool m_has_device = false;
+  Core::DeviceQualifier m_device_qualifier;
+  std::string m_control_name;
 };
 
 class ControlFinder

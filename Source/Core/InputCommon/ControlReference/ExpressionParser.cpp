@@ -119,12 +119,11 @@ public:
     if (FetchBacktickString(value, ':'))
     {
       // Found colon, this is the device name
-      qualifier.has_device = true;
-      qualifier.device_qualifier.FromString(value);
+      qualifier.SetDeviceQualifier(value);
       FetchBacktickString(value);
     }
 
-    qualifier.control_name = std::move(value);
+    qualifier.SetControlName(std::move(value));
 
     return Token(TOK_CONTROL, std::move(qualifier));
   }
@@ -144,7 +143,7 @@ public:
     }
 
     ControlQualifier qualifier;
-    qualifier.control_name = std::move(name);
+    qualifier.SetControlName(std::move(name));
     return Token(TOK_CONTROL, std::move(qualifier));
   }
 
@@ -392,8 +391,8 @@ private:
 
 std::shared_ptr<Device> ControlFinder::FindDevice(const ControlQualifier& qualifier) const
 {
-  if (qualifier.has_device)
-    return container.FindDevice(qualifier.device_qualifier);
+  if (qualifier.HasDevice())
+    return container.FindDevice(qualifier.GetDeviceQualifier());
   else
     return container.FindDevice(default_device);
 }
@@ -404,10 +403,11 @@ Device::Control* ControlFinder::FindControl(const ControlQualifier& qualifier) c
   if (!device)
     return nullptr;
 
+  const auto& control_name = qualifier.GetControlName();
   if (is_input)
-    return device->FindInput(qualifier.control_name);
+    return device->FindInput(control_name);
   else
-    return device->FindOutput(qualifier.control_name);
+    return device->FindOutput(control_name);
 }
 
 struct ParseResult
@@ -551,8 +551,7 @@ static ParseResult ParseComplexExpression(const std::string& str)
 static std::unique_ptr<Expression> ParseBarewordExpression(const std::string& str)
 {
   ControlQualifier qualifier;
-  qualifier.control_name = str;
-  qualifier.has_device = false;
+  qualifier.SetControlName(str);
 
   return std::make_unique<ControlExpression>(std::move(qualifier));
 }
