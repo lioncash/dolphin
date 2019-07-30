@@ -390,7 +390,7 @@ private:
   std::unique_ptr<Expression> m_rhs;
 };
 
-std::shared_ptr<Device> ControlFinder::FindDevice(ControlQualifier qualifier) const
+std::shared_ptr<Device> ControlFinder::FindDevice(const ControlQualifier& qualifier) const
 {
   if (qualifier.has_device)
     return container.FindDevice(qualifier.device_qualifier);
@@ -398,7 +398,7 @@ std::shared_ptr<Device> ControlFinder::FindDevice(ControlQualifier qualifier) co
     return container.FindDevice(default_device);
 }
 
-Device::Control* ControlFinder::FindControl(ControlQualifier qualifier) const
+Device::Control* ControlFinder::FindControl(const ControlQualifier& qualifier) const
 {
   const std::shared_ptr<Device> device = FindDevice(qualifier);
   if (!device)

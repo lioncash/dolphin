@@ -35,8 +35,8 @@ public:
       : container(container_), default_device(default_), is_input(is_input_)
   {
   }
-  std::shared_ptr<Core::Device> FindDevice(ControlQualifier qualifier) const;
-  Core::Device::Control* FindControl(ControlQualifier qualifier) const;
+  std::shared_ptr<Core::Device> FindDevice(const ControlQualifier& qualifier) const;
+  Core::Device::Control* FindControl(const ControlQualifier& qualifier) const;
 
 private:
   const Core::DeviceContainer& container;
