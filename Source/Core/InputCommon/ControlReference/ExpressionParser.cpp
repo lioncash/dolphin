@@ -56,7 +56,10 @@ public:
   ControlQualifier qualifier;
 
   Token(TokenType type_) : type(type_) {}
-  Token(TokenType type_, ControlQualifier qualifier_) : type(type_), qualifier(qualifier_) {}
+  Token(TokenType type_, ControlQualifier qualifier_)
+      : type(type_), qualifier(std::move(qualifier_))
+  {
+  }
   operator std::string() const
   {
     switch (type)
@@ -93,7 +96,7 @@ public:
   std::string expr;
   std::string::iterator it;
 
-  Lexer(const std::string& expr_) : expr(expr_) { it = expr.begin(); }
+  Lexer(std::string expr_) : expr(std::move(expr_)) { it = expr.begin(); }
   bool FetchBacktickString(std::string& value, char otherDelim = 0)
   {
     value = "";
@@ -123,9 +126,9 @@ public:
       FetchBacktickString(value);
     }
 
-    qualifier.control_name = value;
+    qualifier.control_name = std::move(value);
 
-    return Token(TOK_CONTROL, qualifier);
+    return Token(TOK_CONTROL, std::move(qualifier));
   }
 
   Token GetBarewordsControl(char c)
@@ -143,8 +146,8 @@ public:
     }
 
     ControlQualifier qualifier;
-    qualifier.control_name = name;
-    return Token(TOK_CONTROL, qualifier);
+    qualifier.control_name = std::move(name);
+    return Token(TOK_CONTROL, std::move(qualifier));
   }
 
   Token NextToken()
@@ -214,7 +217,7 @@ public:
   // Keep a shared_ptr to the device so the control pointer doesn't become invalid
   std::shared_ptr<Device> m_device;
 
-  explicit ControlExpression(ControlQualifier qualifier_) : qualifier(qualifier_) {}
+  explicit ControlExpression(ControlQualifier qualifier_) : qualifier(std::move(qualifier_)) {}
   ControlState GetValue() const override
   {
     if (!control)
@@ -409,7 +412,10 @@ struct ParseResult
 class Parser
 {
 public:
-  explicit Parser(std::vector<Token> tokens_) : tokens(tokens_) { m_it = tokens.begin(); }
+  explicit Parser(std::vector<Token> tokens_) : tokens(std::move(tokens_))
+  {
+    m_it = tokens.begin();
+  }
   ParseResult Parse() { return Toplevel(); }
 
 private:
@@ -535,7 +541,7 @@ static std::unique_ptr<Expression> ParseBarewordExpression(const std::string& st
   qualifier.control_name = str;
   qualifier.has_device = false;
 
-  return std::make_unique<ControlExpression>(qualifier);
+  return std::make_unique<ControlExpression>(std::move(qualifier));
 }
 
 std::pair<ParseStatus, std::unique_ptr<Expression>> ParseExpression(const std::string& str)
