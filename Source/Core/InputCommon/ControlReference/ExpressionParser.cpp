@@ -55,12 +55,12 @@ public:
   TokenType type;
   ControlQualifier qualifier;
 
-  Token(TokenType type_) : type(type_) {}
-  Token(TokenType type_, ControlQualifier qualifier_)
+  explicit Token(TokenType type_) : type(type_) {}
+  explicit Token(TokenType type_, ControlQualifier qualifier_)
       : type(type_), qualifier(std::move(qualifier_))
   {
   }
-  operator std::string() const
+  explicit operator std::string() const
   {
     switch (type)
     {
@@ -81,7 +81,7 @@ public:
     case TOK_ADD:
       return "+";
     case TOK_CONTROL:
-      return "Device(" + (std::string)qualifier + ")";
+      return std::string("Device(").append(std::string(qualifier)).append(1, ')');
     case TOK_INVALID:
       break;
     }
@@ -96,7 +96,7 @@ public:
   std::string expr;
   std::string::iterator it;
 
-  Lexer(std::string expr_) : expr(std::move(expr_)) { it = expr.begin(); }
+  explicit Lexer(std::string expr_) : expr(std::move(expr_)) { it = expr.begin(); }
   bool FetchBacktickString(std::string& value, char otherDelim = 0)
   {
     value = "";
@@ -242,7 +242,10 @@ public:
     m_device = finder.FindDevice(qualifier);
     control = finder.FindControl(qualifier);
   }
-  operator std::string() const override { return "`" + static_cast<std::string>(qualifier) + "`"; }
+  explicit operator std::string() const override
+  {
+    return std::string("`").append(std::string(qualifier)).append(1, '`');
+  }
 };
 
 class BinaryExpression : public Expression
@@ -252,8 +255,8 @@ public:
   std::unique_ptr<Expression> lhs;
   std::unique_ptr<Expression> rhs;
 
-  BinaryExpression(TokenType op_, std::unique_ptr<Expression>&& lhs_,
-                   std::unique_ptr<Expression>&& rhs_)
+  explicit BinaryExpression(TokenType op_, std::unique_ptr<Expression>&& lhs_,
+                            std::unique_ptr<Expression>&& rhs_)
       : op(op_), lhs(std::move(lhs_)), rhs(std::move(rhs_))
   {
   }
@@ -295,9 +298,14 @@ public:
     rhs->UpdateReferences(finder);
   }
 
-  operator std::string() const override
+  explicit operator std::string() const override
   {
-    return OpName(op) + "(" + (std::string)(*lhs) + ", " + (std::string)(*rhs) + ")";
+    return OpName(op)
+        .append(1, '(')
+        .append(std::string(*lhs))
+        .append(", ")
+        .append(std::string(*rhs))
+        .append(1, ')');
   }
 };
 
@@ -307,7 +315,7 @@ public:
   TokenType op;
   std::unique_ptr<Expression> inner;
 
-  UnaryExpression(TokenType op_, std::unique_ptr<Expression>&& inner_)
+  explicit UnaryExpression(TokenType op_, std::unique_ptr<Expression>&& inner_)
       : op(op_), inner(std::move(inner_))
   {
   }
@@ -339,7 +347,10 @@ public:
 
   int CountNumControls() const override { return inner->CountNumControls(); }
   void UpdateReferences(ControlFinder& finder) override { inner->UpdateReferences(finder); }
-  operator std::string() const override { return OpName(op) + "(" + (std::string)(*inner) + ")"; }
+  explicit operator std::string() const override
+  {
+    return OpName(op).append(1, '(').append(std::string(*inner)).append(1, ')');
+  }
 };
 
 // This class proxies all methods to its either left-hand child if it has bound controls, or its
@@ -347,7 +358,7 @@ public:
 class CoalesceExpression : public Expression
 {
 public:
-  CoalesceExpression(std::unique_ptr<Expression>&& lhs, std::unique_ptr<Expression>&& rhs)
+  explicit CoalesceExpression(std::unique_ptr<Expression>&& lhs, std::unique_ptr<Expression>&& rhs)
       : m_lhs(std::move(lhs)), m_rhs(std::move(rhs))
   {
   }
@@ -356,10 +367,13 @@ public:
   void SetValue(ControlState value) override { GetActiveChild()->SetValue(value); }
 
   int CountNumControls() const override { return GetActiveChild()->CountNumControls(); }
-  operator std::string() const override
+  explicit operator std::string() const override
   {
-    return "Coalesce(" + static_cast<std::string>(*m_lhs) + ", " +
-           static_cast<std::string>(*m_rhs) + ')';
+    return std::string("Coalesce(")
+        .append(std::string(*m_lhs))
+        .append(", ")
+        .append(std::string(*m_rhs))
+        .append(1, ')');
   }
 
   void UpdateReferences(ControlFinder& finder) override
@@ -400,7 +414,7 @@ Device::Control* ControlFinder::FindControl(ControlQualifier qualifier) const
 
 struct ParseResult
 {
-  ParseResult(ParseStatus status_, std::unique_ptr<Expression>&& expr_ = {})
+  explicit ParseResult(ParseStatus status_, std::unique_ptr<Expression>&& expr_ = {})
       : status(status_), expr(std::move(expr_))
   {
   }
@@ -436,11 +450,12 @@ private:
     switch (tok.type)
     {
     case TOK_CONTROL:
-      return {ParseStatus::Successful, std::make_unique<ControlExpression>(tok.qualifier)};
+      return ParseResult{ParseStatus::Successful,
+                         std::make_unique<ControlExpression>(tok.qualifier)};
     case TOK_LPAREN:
       return Paren();
     default:
-      return {ParseStatus::SyntaxError};
+      return ParseResult{ParseStatus::SyntaxError};
     }
   }
 
@@ -463,8 +478,8 @@ private:
       ParseResult result = Atom();
       if (result.status == ParseStatus::SyntaxError)
         return result;
-      return {ParseStatus::Successful,
-              std::make_unique<UnaryExpression>(tok.type, std::move(result.expr))};
+      return ParseResult{ParseStatus::Successful,
+                         std::make_unique<UnaryExpression>(tok.type, std::move(result.expr))};
     }
 
     return Atom();
@@ -503,7 +518,7 @@ private:
                                                 std::move(unary_result.expr));
     }
 
-    return {ParseStatus::Successful, std::move(expr)};
+    return ParseResult{ParseStatus::Successful, std::move(expr)};
   }
 
   ParseResult Paren()
@@ -515,7 +530,7 @@ private:
 
     if (!Expects(TOK_RPAREN))
     {
-      return {ParseStatus::SyntaxError};
+      return ParseResult{ParseStatus::SyntaxError};
     }
 
     return result;
@@ -528,9 +543,9 @@ static ParseResult ParseComplexExpression(const std::string& str)
 {
   Lexer l(str);
   std::vector<Token> tokens;
-  ParseStatus tokenize_status = l.Tokenize(tokens);
+  const ParseStatus tokenize_status = l.Tokenize(tokens);
   if (tokenize_status != ParseStatus::Successful)
-    return {tokenize_status};
+    return ParseResult{tokenize_status};
 
   return Parser(std::move(tokens)).Parse();
 }

@@ -14,15 +14,14 @@ namespace ciface::ExpressionParser
 class ControlQualifier
 {
 public:
-  bool has_device;
+  bool has_device = false;
   Core::DeviceQualifier device_qualifier;
   std::string control_name;
 
-  ControlQualifier() : has_device(false) {}
-  operator std::string() const
+  explicit operator std::string() const
   {
     if (has_device)
-      return device_qualifier.ToString() + ":" + control_name;
+      return device_qualifier.ToString().append(1, ':').append(control_name);
     else
       return control_name;
   }
@@ -31,8 +30,8 @@ public:
 class ControlFinder
 {
 public:
-  ControlFinder(const Core::DeviceContainer& container_, const Core::DeviceQualifier& default_,
-                const bool is_input_)
+  explicit ControlFinder(const Core::DeviceContainer& container_,
+                         const Core::DeviceQualifier& default_, const bool is_input_)
       : container(container_), default_device(default_), is_input(is_input_)
   {
   }
@@ -53,7 +52,7 @@ public:
   virtual void SetValue(ControlState state) = 0;
   virtual int CountNumControls() const = 0;
   virtual void UpdateReferences(ControlFinder& finder) = 0;
-  virtual operator std::string() const = 0;
+  virtual explicit operator std::string() const = 0;
 };
 
 enum class ParseStatus
