@@ -2,8 +2,7 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include <atomic>
-#include <cstring>
+#include "VideoCommon/CommandProcessor.h"
 
 #include "Common/Assert.h"
 #include "Common/Atomic.h"
@@ -17,7 +16,6 @@
 #include "Core/HW/GPFifo.h"
 #include "Core/HW/MMIO.h"
 #include "Core/HW/ProcessorInterface.h"
-#include "VideoCommon/CommandProcessor.h"
 #include "VideoCommon/Fifo.h"
 
 namespace CommandProcessor
@@ -113,19 +111,12 @@ void Init()
   s_cp_status_reg.ReadIdle = 1;
 
   s_cp_ctrl_reg.Hex = 0;
-
   s_cp_clear_reg.Hex = 0;
 
   s_bbox = {0, 0, 640, 480};
-
   s_token_reg = 0;
 
-  memset(&fifo, 0, sizeof(fifo));
-  fifo.bFF_Breakpoint = 0;
-  fifo.bFF_HiWatermark = 0;
-  fifo.bFF_HiWatermarkInt = 0;
-  fifo.bFF_LoWatermark = 0;
-  fifo.bFF_LoWatermarkInt = 0;
+  fifo = {};
 
   s_interrupt_set.Clear();
   s_interrupt_waiting.Clear();
