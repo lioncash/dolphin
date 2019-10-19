@@ -381,21 +381,21 @@ void SetCPStatusFromGPU()
     {
       if (!fifo.bFF_Breakpoint)
       {
-        DEBUG_LOG(COMMANDPROCESSOR, "Hit breakpoint at %i", fifo.CPReadPointer);
+        DEBUG_LOG(COMMANDPROCESSOR, "Hit breakpoint at %u", fifo.CPReadPointer);
         fifo.bFF_Breakpoint = true;
       }
     }
     else
     {
       if (fifo.bFF_Breakpoint)
-        DEBUG_LOG(COMMANDPROCESSOR, "Cleared breakpoint at %i", fifo.CPReadPointer);
+        DEBUG_LOG(COMMANDPROCESSOR, "Cleared breakpoint at %u", fifo.CPReadPointer);
       fifo.bFF_Breakpoint = false;
     }
   }
   else
   {
     if (fifo.bFF_Breakpoint)
-      DEBUG_LOG(COMMANDPROCESSOR, "Cleared breakpoint at %i", fifo.CPReadPointer);
+      DEBUG_LOG(COMMANDPROCESSOR, "Cleared breakpoint at %u", fifo.CPReadPointer);
     fifo.bFF_Breakpoint = false;
   }
 
