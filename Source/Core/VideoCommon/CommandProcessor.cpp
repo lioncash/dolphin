@@ -11,6 +11,7 @@
 #include "Common/CommonTypes.h"
 #include "Common/Flag.h"
 #include "Common/Logging/Log.h"
+#include "Common/MathUtil.h"
 #include "Core/ConfigManager.h"
 #include "Core/CoreTiming.h"
 #include "Core/HW/GPFifo.h"
@@ -31,10 +32,7 @@ static UCPStatusReg m_CPStatusReg;
 static UCPCtrlReg m_CPCtrlReg;
 static UCPClearReg m_CPClearReg;
 
-static u16 m_bboxleft;
-static u16 m_bboxtop;
-static u16 m_bboxright;
-static u16 m_bboxbottom;
+static MathUtil::Rectangle<u16> s_bbox;
 static u16 m_tokenReg;
 
 static Common::Flag s_interrupt_set;
@@ -80,10 +78,10 @@ void DoState(PointerWrap& p)
   p.DoPOD(m_CPStatusReg);
   p.DoPOD(m_CPCtrlReg);
   p.DoPOD(m_CPClearReg);
-  p.Do(m_bboxleft);
-  p.Do(m_bboxtop);
-  p.Do(m_bboxright);
-  p.Do(m_bboxbottom);
+  p.Do(s_bbox.left);
+  p.Do(s_bbox.top);
+  p.Do(s_bbox.right);
+  p.Do(s_bbox.bottom);
   p.Do(m_tokenReg);
   fifo.DoState(p);
 
@@ -118,10 +116,7 @@ void Init()
 
   m_CPClearReg.Hex = 0;
 
-  m_bboxleft = 0;
-  m_bboxtop = 0;
-  m_bboxright = 640;
-  m_bboxbottom = 480;
+  s_bbox = {0, 0, 640, 480};
 
   m_tokenReg = 0;
 
@@ -165,10 +160,10 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
       {FIFO_TOKEN_REGISTER, &m_tokenReg, false, WMASK_ALL},
 
       // Bounding box registers are read only.
-      {FIFO_BOUNDING_BOX_LEFT, &m_bboxleft, true, WMASK_NONE},
-      {FIFO_BOUNDING_BOX_RIGHT, &m_bboxright, true, WMASK_NONE},
-      {FIFO_BOUNDING_BOX_TOP, &m_bboxtop, true, WMASK_NONE},
-      {FIFO_BOUNDING_BOX_BOTTOM, &m_bboxbottom, true, WMASK_NONE},
+      {FIFO_BOUNDING_BOX_LEFT, &s_bbox.left, true, WMASK_NONE},
+      {FIFO_BOUNDING_BOX_RIGHT, &s_bbox.right, true, WMASK_NONE},
+      {FIFO_BOUNDING_BOX_TOP, &s_bbox.top, true, WMASK_NONE},
+      {FIFO_BOUNDING_BOX_BOTTOM, &s_bbox.bottom, true, WMASK_NONE},
       {FIFO_BASE_LO, MMIO::Utils::LowPart(&fifo.CPBase), false, WMASK_LO_ALIGN_32BIT},
       {FIFO_BASE_HI, MMIO::Utils::HighPart(&fifo.CPBase), false, WMASK_HI_RESTRICT},
       {FIFO_END_LO, MMIO::Utils::LowPart(&fifo.CPEnd), false, WMASK_LO_ALIGN_32BIT},
