@@ -25,17 +25,6 @@ enum class FPCC
   FU = 1,  // ?
 };
 
-inline void SetFPException(UReg_FPSCR* fpscr, u32 mask)
-{
-  if ((fpscr->Hex & mask) != mask)
-  {
-    fpscr->FX = 1;
-  }
-
-  fpscr->Hex |= mask;
-  fpscr->VX = (fpscr->Hex & FPSCR_VX_ANY) != 0;
-}
-
 inline double ForceSingle(const UReg_FPSCR& fpscr, double value)
 {
   // convert to float...
@@ -83,7 +72,7 @@ struct FPResult
   void SetException(UReg_FPSCR* fpscr, FPSCRExceptionFlag flag)
   {
     exception = flag;
-    SetFPException(fpscr, flag);
+    fpscr->SetFPException(flag);
   }
 
   double value = 0.0;

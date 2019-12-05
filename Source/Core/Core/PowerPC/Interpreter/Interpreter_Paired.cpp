@@ -131,7 +131,7 @@ void Interpreter::ps_res(UGeckoInstruction inst)
 
   if (a == 0.0 || b == 0.0)
   {
-    SetFPException(&FPSCR, FPSCR_ZX);
+    FPSCR.SetFPException(FPSCR_ZX);
     FPSCR.ClearFIFR();
   }
 
@@ -139,7 +139,7 @@ void Interpreter::ps_res(UGeckoInstruction inst)
     FPSCR.ClearFIFR();
 
   if (Common::IsSNAN(a) || Common::IsSNAN(b))
-    SetFPException(&FPSCR, FPSCR_VXSNAN);
+    FPSCR.SetFPException(FPSCR_VXSNAN);
 
   const double ps0 = Common::ApproximateReciprocal(a);
   const double ps1 = Common::ApproximateReciprocal(b);
@@ -158,13 +158,13 @@ void Interpreter::ps_rsqrte(UGeckoInstruction inst)
 
   if (ps0 == 0.0 || ps1 == 0.0)
   {
-    SetFPException(&FPSCR, FPSCR_ZX);
+    FPSCR.SetFPException(FPSCR_ZX);
     FPSCR.ClearFIFR();
   }
 
   if (ps0 < 0.0 || ps1 < 0.0)
   {
-    SetFPException(&FPSCR, FPSCR_VXSQRT);
+    FPSCR.SetFPException(FPSCR_VXSQRT);
     FPSCR.ClearFIFR();
   }
 
@@ -172,7 +172,7 @@ void Interpreter::ps_rsqrte(UGeckoInstruction inst)
     FPSCR.ClearFIFR();
 
   if (Common::IsSNAN(ps0) || Common::IsSNAN(ps1))
-    SetFPException(&FPSCR, FPSCR_VXSNAN);
+    FPSCR.SetFPException(FPSCR_VXSNAN);
 
   const double dst_ps0 = ForceSingle(FPSCR, Common::ApproximateReciprocalSquareRoot(ps0));
   const double dst_ps1 = ForceSingle(FPSCR, Common::ApproximateReciprocalSquareRoot(ps1));

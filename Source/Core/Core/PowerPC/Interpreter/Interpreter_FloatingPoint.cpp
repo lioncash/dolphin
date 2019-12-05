@@ -22,15 +22,6 @@ enum class RoundingMode
   TowardsNegativeInfinity = 0b11
 };
 
-static void SetFI(UReg_FPSCR* fpscr, int FI)
-{
-  if (FI)
-  {
-    SetFPException(fpscr, FPSCR_XX);
-  }
-  fpscr->FI = FI;
-}
-
 // Note that the convert to integer operation is defined
 // in Appendix C.4.2 in PowerPC Microprocessor Family:
 // The Programming Environments Manual for 32 and 64-bit Microprocessors
@@ -43,24 +34,24 @@ void ConvertToInteger(UGeckoInstruction inst, RoundingMode rounding_mode)
   if (std::isnan(b))
   {
     if (Common::IsSNAN(b))
-      SetFPException(&FPSCR, FPSCR_VXSNAN);
+      FPSCR.SetFPException(FPSCR_VXSNAN);
 
     value = 0x80000000;
-    SetFPException(&FPSCR, FPSCR_VXCVI);
+    FPSCR.SetFPException(FPSCR_VXCVI);
     exception_occurred = true;
   }
   else if (b > static_cast<double>(0x7fffffff))
   {
     // Positive large operand or +inf
     value = 0x7fffffff;
-    SetFPException(&FPSCR, FPSCR_VXCVI);
+    FPSCR.SetFPException(FPSCR_VXCVI);
     exception_occurred = true;
   }
   else if (b < -static_cast<double>(0x80000000))
   {
     // Negative large operand or -inf
     value = 0x80000000;
-    SetFPException(&FPSCR, FPSCR_VXCVI);
+    FPSCR.SetFPException(FPSCR_VXCVI);
     exception_occurred = true;
   }
   else
@@ -106,7 +97,7 @@ void ConvertToInteger(UGeckoInstruction inst, RoundingMode rounding_mode)
     else
     {
       // Also sets FPSCR[XX]
-      SetFI(&FPSCR, 1);
+      FPSCR.SetFI(1);
       FPSCR.FR = fabs(di) > fabs(b);
     }
   }
@@ -141,15 +132,15 @@ void Interpreter::Helper_FloatCompareOrdered(UGeckoInstruction inst, double fa, 
     compare_result = FPCC::FU;
     if (Common::IsSNAN(fa) || Common::IsSNAN(fb))
     {
-      SetFPException(&FPSCR, FPSCR_VXSNAN);
+      FPSCR.SetFPException(FPSCR_VXSNAN);
       if (FPSCR.VE == 0)
       {
-        SetFPException(&FPSCR, FPSCR_VXVC);
+        FPSCR.SetFPException(FPSCR_VXVC);
       }
     }
     else  // QNaN
     {
-      SetFPException(&FPSCR, FPSCR_VXVC);
+      FPSCR.SetFPException(FPSCR_VXVC);
     }
   }
   else if (fa < fb)
@@ -183,7 +174,7 @@ void Interpreter::Helper_FloatCompareUnordered(UGeckoInstruction inst, double fa
 
     if (Common::IsSNAN(fa) || Common::IsSNAN(fb))
     {
-      SetFPException(&FPSCR, FPSCR_VXSNAN);
+      FPSCR.SetFPException(FPSCR_VXSNAN);
     }
   }
   else if (fa < fb)
@@ -295,7 +286,7 @@ void Interpreter::frspx(UGeckoInstruction inst)  // round to single
     const bool is_snan = Common::IsSNAN(b);
 
     if (is_snan)
-      SetFPException(&FPSCR, FPSCR_VXSNAN);
+      FPSCR.SetFPException(FPSCR_VXSNAN);
 
     if (!is_snan || FPSCR.VE == 0)
     {
@@ -307,7 +298,7 @@ void Interpreter::frspx(UGeckoInstruction inst)  // round to single
   }
   else
   {
-    SetFI(&FPSCR, b != rounded);
+    FPSCR.SetFI(b != rounded);
     FPSCR.FR = fabs(rounded) > fabs(b);
     PowerPC::UpdateFPRF(rounded);
     rPS(inst.FD).Fill(rounded);
@@ -488,7 +479,7 @@ void Interpreter::fresx(UGeckoInstruction inst)
 
   if (b == 0.0)
   {
-    SetFPException(&FPSCR, FPSCR_ZX);
+    FPSCR.SetFPException(FPSCR_ZX);
     FPSCR.ClearFIFR();
 
     if (FPSCR.ZE == 0)
@@ -496,7 +487,7 @@ void Interpreter::fresx(UGeckoInstruction inst)
   }
   else if (Common::IsSNAN(b))
   {
-    SetFPException(&FPSCR, FPSCR_VXSNAN);
+    FPSCR.SetFPException(FPSCR_VXSNAN);
     FPSCR.ClearFIFR();
 
     if (FPSCR.VE == 0)
@@ -526,7 +517,7 @@ void Interpreter::frsqrtex(UGeckoInstruction inst)
 
   if (b < 0.0)
   {
-    SetFPException(&FPSCR, FPSCR_VXSQRT);
+    FPSCR.SetFPException(FPSCR_VXSQRT);
     FPSCR.ClearFIFR();
 
     if (FPSCR.VE == 0)
@@ -534,7 +525,7 @@ void Interpreter::frsqrtex(UGeckoInstruction inst)
   }
   else if (b == 0.0)
   {
-    SetFPException(&FPSCR, FPSCR_ZX);
+    FPSCR.SetFPException(FPSCR_ZX);
     FPSCR.ClearFIFR();
 
     if (FPSCR.ZE == 0)
@@ -542,7 +533,7 @@ void Interpreter::frsqrtex(UGeckoInstruction inst)
   }
   else if (Common::IsSNAN(b))
   {
-    SetFPException(&FPSCR, FPSCR_VXSNAN);
+    FPSCR.SetFPException(FPSCR_VXSNAN);
     FPSCR.ClearFIFR();
 
     if (FPSCR.VE == 0)

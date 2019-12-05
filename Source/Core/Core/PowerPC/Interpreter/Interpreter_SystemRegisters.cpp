@@ -69,8 +69,8 @@ void Interpreter::mtfsb1x(UGeckoInstruction inst)
   const u32 bit = inst.CRBD;
   const u32 b = 0x80000000 >> bit;
 
-  if (b & FPSCR_ANY_X)
-    SetFPException(&FPSCR, b);
+  if ((b & FPSCR_ANY_X) != 0)
+    FPSCR.SetFPException(b);
   else
     FPSCR |= b;
 
