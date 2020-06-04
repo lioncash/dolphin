@@ -298,12 +298,14 @@ public final class InputOverlay extends SurfaceView implements OnTouchListener
     if (!pressed && overlayPointer != null)
     {
       overlayPointer.onTouch(event);
-      float[] axises = overlayPointer.getAxisValues();
+      float[] axes = overlayPointer.getAxisValues();
 
-      NativeLibrary.onGamePadMoveEvent(NativeLibrary.TouchScreenDevice, ButtonType.WIIMOTE_IR + 2,
-              axises[0]);
-      NativeLibrary.onGamePadMoveEvent(NativeLibrary.TouchScreenDevice, ButtonType.WIIMOTE_IR + 4,
-              axises[1]);
+      for (int i = 0; i < 4; i++)
+      {
+        NativeLibrary
+                .onGamePadMoveEvent(NativeLibrary.TouchScreenDevice, ButtonType.WIIMOTE_IR_UP + i,
+                        axes[i]);
+      }
     }
 
     invalidate();
@@ -569,22 +571,11 @@ public final class InputOverlay extends SurfaceView implements OnTouchListener
     }
     if (mPreferences.getBoolean("buttonToggleWii7", true))
     {
-      if (mPreferences.getInt("wiiController", 3) == 2)
-      {
-        overlayDpads.add(initializeOverlayDpad(getContext(), R.drawable.gcwii_dpad,
-                R.drawable.gcwii_dpad_pressed_one_direction,
-                R.drawable.gcwii_dpad_pressed_two_directions,
-                ButtonType.WIIMOTE_RIGHT, ButtonType.WIIMOTE_LEFT,
-                ButtonType.WIIMOTE_UP, ButtonType.WIIMOTE_DOWN, orientation));
-      }
-      else
-      {
-        overlayDpads.add(initializeOverlayDpad(getContext(), R.drawable.gcwii_dpad,
-                R.drawable.gcwii_dpad_pressed_one_direction,
-                R.drawable.gcwii_dpad_pressed_two_directions,
-                ButtonType.WIIMOTE_UP, ButtonType.WIIMOTE_DOWN,
-                ButtonType.WIIMOTE_LEFT, ButtonType.WIIMOTE_RIGHT, orientation));
-      }
+      overlayDpads.add(initializeOverlayDpad(getContext(), R.drawable.gcwii_dpad,
+              R.drawable.gcwii_dpad_pressed_one_direction,
+              R.drawable.gcwii_dpad_pressed_two_directions,
+              ButtonType.WIIMOTE_UP, ButtonType.WIIMOTE_DOWN,
+              ButtonType.WIIMOTE_LEFT, ButtonType.WIIMOTE_RIGHT, orientation));
     }
   }
 

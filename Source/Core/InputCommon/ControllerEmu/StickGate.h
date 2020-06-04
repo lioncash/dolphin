@@ -11,6 +11,7 @@
 
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
+#include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
 
 namespace ControllerEmu
 {
@@ -47,6 +48,7 @@ class RoundStickGate : public StickGate
 public:
   explicit RoundStickGate(ControlState radius);
   ControlState GetRadiusAtAngle(double ang) const override final;
+  std::optional<u32> GetIdealCalibrationSampleCount() const override final;
 
 private:
   const ControlState m_radius;
@@ -77,15 +79,11 @@ public:
 
   using ReshapeData = Common::DVec2;
 
-  enum
-  {
-    SETTING_DEADZONE,
-    SETTING_COUNT,
-  };
-
   // Angle is in radians and should be non-negative
   ControlState GetDeadzoneRadiusAtAngle(double angle) const;
   ControlState GetInputRadiusAtAngle(double angle) const;
+
+  ControlState GetDeadzonePercentage() const;
 
   virtual ControlState GetGateRadiusAtAngle(double angle) const = 0;
   virtual ReshapeData GetReshapableState(bool adjusted) = 0;
@@ -100,6 +98,9 @@ public:
   const CalibrationData& GetCalibrationData() const;
   void SetCalibrationData(CalibrationData data);
 
+  const ReshapeData& GetCenter() const;
+  void SetCenter(ReshapeData center);
+
 protected:
   ReshapeData Reshape(ControlState x, ControlState y, ControlState modifier = 0.0);
 
@@ -108,6 +109,8 @@ private:
   void SaveConfig(IniFile::Section*, const std::string&, const std::string&) override;
 
   CalibrationData m_calibration;
+  SettingValue<double> m_deadzone_setting;
+  ReshapeData m_center;
 };
 
 }  // namespace ControllerEmu

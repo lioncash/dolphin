@@ -87,8 +87,10 @@ std::unique_ptr<VKTexture> VKTexture::Create(const TextureConfig& tex_config)
 
   VkMemoryAllocateInfo memory_info = {
       VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, nullptr, memory_requirements.size,
-      g_vulkan_context->GetMemoryType(memory_requirements.memoryTypeBits,
-                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
+      g_vulkan_context
+          ->GetMemoryType(memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                          false)
+          .value_or(0)};
 
   VkDeviceMemory device_memory;
   res = vkAllocateMemory(g_vulkan_context->GetDevice(), &memory_info, nullptr, &device_memory);
@@ -121,7 +123,7 @@ std::unique_ptr<VKTexture> VKTexture::CreateAdopted(const TextureConfig& tex_con
 {
   std::unique_ptr<VKTexture> texture = std::make_unique<VKTexture>(
       tex_config, nullptr, image, layout, ComputeImageLayout::Undefined);
-  if (!texture->CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY))
+  if (!texture->CreateView(view_type))
     return nullptr;
 
   return texture;
@@ -138,7 +140,7 @@ bool VKTexture::CreateView(VkImageViewType type)
       GetVkFormat(),
       {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
        VK_COMPONENT_SWIZZLE_IDENTITY},
-      {GetImageAspectForFormat(GetFormat()), 0, GetLevels(), 0, GetLayers()}};
+      {GetImageViewAspectForFormat(GetFormat()), 0, GetLevels(), 0, GetLayers()}};
 
   VkResult res = vkCreateImageView(g_vulkan_context->GetDevice(), &view_info, nullptr, &m_view);
   if (res != VK_SUCCESS)
@@ -229,6 +231,21 @@ VkImageAspectFlags VKTexture::GetImageAspectForFormat(AbstractTextureFormat form
     return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
   case AbstractTextureFormat::D16:
+  case AbstractTextureFormat::D32F:
+    return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+  default:
+    return VK_IMAGE_ASPECT_COLOR_BIT;
+  }
+}
+
+VkImageAspectFlags VKTexture::GetImageViewAspectForFormat(AbstractTextureFormat format)
+{
+  switch (format)
+  {
+  case AbstractTextureFormat::D16:
+  case AbstractTextureFormat::D24_S8:
+  case AbstractTextureFormat::D32F_S8:
   case AbstractTextureFormat::D32F:
     return VK_IMAGE_ASPECT_DEPTH_BIT;
 
@@ -674,11 +691,7 @@ VKStagingTexture::VKStagingTexture(StagingTextureType type, const TextureConfig&
 {
 }
 
-VKStagingTexture::~VKStagingTexture()
-{
-  if (m_needs_flush)
-    VKStagingTexture::Flush();
-}
+VKStagingTexture::~VKStagingTexture() = default;
 
 std::unique_ptr<VKStagingTexture> VKStagingTexture::Create(StagingTextureType type,
                                                            const TextureConfig& config)
@@ -739,14 +752,6 @@ void VKStagingTexture::CopyFromTexture(const AbstractTexture* src,
   ASSERT(dst_rect.left >= 0 && static_cast<u32>(dst_rect.right) <= m_config.width &&
          dst_rect.top >= 0 && static_cast<u32>(dst_rect.bottom) <= m_config.height);
 
-  if (m_needs_flush)
-  {
-    // Drop copy before reusing it.
-    g_command_buffer_mgr->RemoveFenceSignaledCallback(this);
-    m_flush_fence = VK_NULL_HANDLE;
-    m_needs_flush = false;
-  }
-
   StateTracker::GetInstance()->EndRenderPass();
 
   VkImageLayout old_layout = src_tex->GetLayout();
@@ -755,7 +760,7 @@ void VKStagingTexture::CopyFromTexture(const AbstractTexture* src,
 
   // Issue the image->buffer copy, but delay it for now.
   VkBufferImageCopy image_copy = {};
-  const VkImageAspectFlags aspect = VKTexture::GetImageAspectForFormat(src_tex->GetFormat());
+  const VkImageAspectFlags aspect = VKTexture::GetImageViewAspectForFormat(src_tex->GetFormat());
   image_copy.bufferOffset =
       static_cast<VkDeviceSize>(static_cast<size_t>(dst_rect.top) * m_config.GetStride() +
                                 static_cast<size_t>(dst_rect.left) * m_texel_size);
@@ -773,16 +778,7 @@ void VKStagingTexture::CopyFromTexture(const AbstractTexture* src,
   src_tex->TransitionToLayout(g_command_buffer_mgr->GetCurrentCommandBuffer(), old_layout);
 
   m_needs_flush = true;
-  m_flush_fence = g_command_buffer_mgr->GetCurrentCommandBufferFence();
-  g_command_buffer_mgr->AddFenceSignaledCallback(this, [this](VkFence fence) {
-    if (m_flush_fence != fence)
-      return;
-
-    m_flush_fence = VK_NULL_HANDLE;
-    m_needs_flush = false;
-    g_command_buffer_mgr->RemoveFenceSignaledCallback(this);
-    m_staging_buffer->InvalidateCPUCache();
-  });
+  m_flush_fence_counter = g_command_buffer_mgr->GetCurrentFenceCounter();
 }
 
 void VKStagingTexture::CopyToTexture(const MathUtil::Rectangle<int>& src_rect, AbstractTexture* dst,
@@ -797,14 +793,6 @@ void VKStagingTexture::CopyToTexture(const MathUtil::Rectangle<int>& src_rect, A
          src_rect.top >= 0 && static_cast<u32>(src_rect.bottom) <= m_config.height);
   ASSERT(dst_rect.left >= 0 && static_cast<u32>(dst_rect.right) <= dst_tex->GetWidth() &&
          dst_rect.top >= 0 && static_cast<u32>(dst_rect.bottom) <= dst_tex->GetHeight());
-
-  if (m_needs_flush)
-  {
-    // Drop copy before reusing it.
-    g_command_buffer_mgr->RemoveFenceSignaledCallback(this);
-    m_flush_fence = VK_NULL_HANDLE;
-    m_needs_flush = false;
-  }
 
   // Flush caches before copying.
   m_staging_buffer->FlushCPUCache();
@@ -833,15 +821,7 @@ void VKStagingTexture::CopyToTexture(const MathUtil::Rectangle<int>& src_rect, A
   dst_tex->TransitionToLayout(g_command_buffer_mgr->GetCurrentCommandBuffer(), old_layout);
 
   m_needs_flush = true;
-  m_flush_fence = g_command_buffer_mgr->GetCurrentCommandBufferFence();
-  g_command_buffer_mgr->AddFenceSignaledCallback(this, [this](VkFence fence) {
-    if (m_flush_fence != fence)
-      return;
-
-    m_flush_fence = VK_NULL_HANDLE;
-    m_needs_flush = false;
-    g_command_buffer_mgr->RemoveFenceSignaledCallback(this);
-  });
+  m_flush_fence_counter = g_command_buffer_mgr->GetCurrentFenceCounter();
 }
 
 bool VKStagingTexture::Map()
@@ -860,25 +840,23 @@ void VKStagingTexture::Flush()
   if (!m_needs_flush)
     return;
 
-  // Either of the below two calls will cause the callback to fire.
-  g_command_buffer_mgr->RemoveFenceSignaledCallback(this);
-  if (m_flush_fence == g_command_buffer_mgr->GetCurrentCommandBufferFence())
+  // Is this copy in the current command buffer?
+  if (g_command_buffer_mgr->GetCurrentFenceCounter() == m_flush_fence_counter)
   {
-    // The readback is in the current command buffer, and we must execute it.
+    // Execute the command buffer and wait for it to finish.
     Renderer::GetInstance()->ExecuteCommandBuffer(false, true);
   }
   else
   {
-    // WaitForFence should fire the callback.
-    g_command_buffer_mgr->WaitForFence(m_flush_fence);
+    // Wait for the GPU to finish with it.
+    g_command_buffer_mgr->WaitForFenceCounter(m_flush_fence_counter);
   }
-
-  DEBUG_ASSERT(m_flush_fence == VK_NULL_HANDLE);
-  m_needs_flush = false;
 
   // For readback textures, invalidate the CPU cache as there is new data there.
   if (m_type == StagingTextureType::Readback || m_type == StagingTextureType::Mutable)
     m_staging_buffer->InvalidateCPUCache();
+
+  m_needs_flush = false;
 }
 
 VKFramebuffer::VKFramebuffer(VKTexture* color_attachment, VKTexture* depth_attachment, u32 width,

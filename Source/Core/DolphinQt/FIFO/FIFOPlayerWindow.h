@@ -11,6 +11,7 @@ class QDialogButtonBox;
 class QLabel;
 class QPushButton;
 class QSpinBox;
+class QTabWidget;
 class FIFOAnalyzer;
 
 class FIFOPlayerWindow : public QDialog
@@ -44,6 +45,7 @@ private:
   void UpdateLimits();
 
   QLabel* m_info_label;
+  QTabWidget* m_tab_widget;
   QPushButton* m_load;
   QPushButton* m_save;
   QPushButton* m_record;

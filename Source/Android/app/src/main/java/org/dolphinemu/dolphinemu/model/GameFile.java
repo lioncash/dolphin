@@ -11,6 +11,8 @@ public class GameFile
     mPointer = pointer;
   }
 
+  public native static GameFile parse(String path);
+
   @Override
   public native void finalize();
 
@@ -51,12 +53,5 @@ public class GameFile
   public String getCustomCoverPath()
   {
     return getPath().substring(0, getPath().lastIndexOf(".")) + ".cover.png";
-  }
-
-  public String getScreenshotPath()
-  {
-    String gameId = getGameId();
-    return "file://" + Environment.getExternalStorageDirectory().getPath() +
-            "/dolphin-emu/ScreenShots/" + gameId + "/" + gameId + "-1.png";
   }
 }

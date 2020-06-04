@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QSize>
 
 #include "AudioCommon/AudioCommon.h"
@@ -18,6 +19,7 @@
 #include "Core/Config/MainSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
+#include "Core/IOS/IOS.h"
 #include "Core/NetPlayClient.h"
 #include "Core/NetPlayServer.h"
 
@@ -26,6 +28,10 @@
 
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/InputConfig.h"
+
+#include "VideoCommon/NetPlayChatUI.h"
+#include "VideoCommon/NetPlayGolfUI.h"
+#include "VideoCommon/RenderBase.h"
 
 Settings::Settings()
 {
@@ -67,17 +73,22 @@ void Settings::SetThemeName(const QString& theme_name)
 
 QString Settings::GetCurrentUserStyle() const
 {
-  return GetQSettings().value(QStringLiteral("userstyle/path"), false).toString();
+  if (GetQSettings().contains(QStringLiteral("userstyle/name")))
+    return GetQSettings().value(QStringLiteral("userstyle/name")).toString();
+
+  // Migration code for the old way of storing this setting
+  return QFileInfo(GetQSettings().value(QStringLiteral("userstyle/path")).toString()).fileName();
 }
 
-void Settings::SetCurrentUserStyle(const QString& stylesheet_path)
+void Settings::SetCurrentUserStyle(const QString& stylesheet_name)
 {
   QString stylesheet_contents;
 
-  if (!stylesheet_path.isEmpty() && AreUserStylesEnabled())
+  if (!stylesheet_name.isEmpty() && AreUserStylesEnabled())
   {
     // Load custom user stylesheet
-    QFile stylesheet(stylesheet_path);
+    QDir directory = QDir(QString::fromStdString(File::GetUserPath(D_STYLES_IDX)));
+    QFile stylesheet(directory.filePath(stylesheet_name));
 
     if (stylesheet.open(QFile::ReadOnly))
       stylesheet_contents = QString::fromUtf8(stylesheet.readAll().data());
@@ -85,7 +96,7 @@ void Settings::SetCurrentUserStyle(const QString& stylesheet_path)
 
   qApp->setStyleSheet(stylesheet_contents);
 
-  GetQSettings().setValue(QStringLiteral("userstyle/path"), stylesheet_path);
+  GetQSettings().setValue(QStringLiteral("userstyle/name"), stylesheet_name);
 }
 
 bool Settings::AreUserStylesEnabled() const
@@ -134,6 +145,11 @@ void Settings::RemovePath(const QString& qpath)
 void Settings::RefreshGameList()
 {
   emit GameListRefreshRequested();
+}
+
+void Settings::NotifyRefreshGameListComplete()
+{
+  emit GameListRefreshCompleted();
 }
 
 void Settings::RefreshMetadata()
@@ -216,13 +232,13 @@ void Settings::SetKeepWindowOnTop(bool top)
   if (IsKeepWindowOnTopEnabled() == top)
     return;
 
-  SConfig::GetInstance().bKeepWindowOnTop = top;
+  Config::SetBaseOrCurrent(Config::MAIN_KEEP_WINDOW_ON_TOP, top);
   emit KeepWindowOnTopChanged(top);
 }
 
 bool Settings::IsKeepWindowOnTopEnabled() const
 {
-  return SConfig::GetInstance().bKeepWindowOnTop;
+  return Config::Get(Config::MAIN_KEEP_WINDOW_ON_TOP);
 }
 
 int Settings::GetVolume() const
@@ -293,6 +309,9 @@ std::shared_ptr<NetPlay::NetPlayClient> Settings::GetNetPlayClient()
 void Settings::ResetNetPlayClient(NetPlay::NetPlayClient* client)
 {
   m_client.reset(client);
+
+  g_netplay_chat_ui.reset();
+  g_netplay_golf_ui.reset();
 }
 
 std::shared_ptr<NetPlay::NetPlayServer> Settings::GetNetPlayServer()
@@ -345,6 +364,20 @@ void Settings::SetRegistersVisible(bool enabled)
   }
 }
 
+bool Settings::IsThreadsVisible() const
+{
+  return GetQSettings().value(QStringLiteral("debugger/showthreads")).toBool();
+}
+
+void Settings::SetThreadsVisible(bool enabled)
+{
+  if (IsThreadsVisible() == enabled)
+    return;
+
+  GetQSettings().setValue(QStringLiteral("debugger/showthreads"), enabled);
+  emit ThreadsVisibilityChanged(enabled);
+}
+
 bool Settings::IsRegistersVisible() const
 {
   return GetQSettings().value(QStringLiteral("debugger/showregisters")).toBool();
@@ -380,16 +413,6 @@ bool Settings::IsBreakpointsVisible() const
   return GetQSettings().value(QStringLiteral("debugger/showbreakpoints")).toBool();
 }
 
-bool Settings::IsControllerStateNeeded() const
-{
-  return m_controller_state_needed;
-}
-
-void Settings::SetControllerStateNeeded(bool needed)
-{
-  m_controller_state_needed = needed;
-}
-
 void Settings::SetCodeVisible(bool enabled)
 {
   if (IsCodeVisible() != enabled)
@@ -417,6 +440,20 @@ void Settings::SetMemoryVisible(bool enabled)
 bool Settings::IsMemoryVisible() const
 {
   return QSettings().value(QStringLiteral("debugger/showmemory")).toBool();
+}
+
+void Settings::SetNetworkVisible(bool enabled)
+{
+  if (IsNetworkVisible() == enabled)
+    return;
+
+  GetQSettings().setValue(QStringLiteral("debugger/shownetwork"), enabled);
+  emit NetworkVisibilityChanged(enabled);
+}
+
+bool Settings::IsNetworkVisible() const
+{
+  return GetQSettings().value(QStringLiteral("debugger/shownetwork")).toBool();
 }
 
 void Settings::SetJITVisible(bool enabled)
@@ -525,6 +562,24 @@ bool Settings::IsBatchModeEnabled() const
 void Settings::SetBatchModeEnabled(bool batch)
 {
   m_batch = batch;
+}
+
+bool Settings::IsSDCardInserted() const
+{
+  return SConfig::GetInstance().m_WiiSDCard;
+}
+
+void Settings::SetSDCardInserted(bool inserted)
+{
+  if (IsSDCardInserted() != inserted)
+  {
+    SConfig::GetInstance().m_WiiSDCard = inserted;
+    emit SDCardInsertionChanged(inserted);
+
+    auto* ios = IOS::HLE::GetIOS();
+    if (ios)
+      ios->SDIO_EventNotify();
+  }
 }
 
 bool Settings::IsUSBKeyboardConnected() const

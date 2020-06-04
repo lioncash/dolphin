@@ -22,7 +22,7 @@ u8 DSP::Host::ReadHostMemory(u32 addr)
 void DSP::Host::WriteHostMemory(u8 value, u32 addr)
 {
 }
-void DSP::Host::OSD_AddMessage(const std::string& str, u32 ms)
+void DSP::Host::OSD_AddMessage(std::string str, u32 ms)
 {
 }
 bool DSP::Host::OnThread()
@@ -217,7 +217,7 @@ static void PrintResults(const std::string& input_name, const std::string& outpu
   if (output_name.empty())
     printf("%s", results.c_str());
   else
-    File::WriteStringToFile(results, output_name.c_str());
+    File::WriteStringToFile(output_name, results);
 }
 
 static bool PerformDisassembly(const std::string& input_name, const std::string& output_name)
@@ -237,7 +237,7 @@ static bool PerformDisassembly(const std::string& input_name, const std::string&
   if (output_name.empty())
     printf("%s", text.c_str());
   else
-    File::WriteStringToFile(text, output_name);
+    File::WriteStringToFile(output_name, text);
 
   printf("Disassembly completed successfully!\n");
   return true;
@@ -314,7 +314,7 @@ static bool PerformAssembly(const std::string& input_name, const std::string& ou
       }
 
       const std::string header = CodesToHeader(codes, files);
-      File::WriteStringToFile(header, output_header_name + ".h");
+      File::WriteStringToFile(output_header_name + ".h", header);
     }
     else
     {
@@ -334,12 +334,12 @@ static bool PerformAssembly(const std::string& input_name, const std::string& ou
       if (!output_name.empty())
       {
         const std::string binary_code = DSP::CodeToBinaryStringBE(code);
-        File::WriteStringToFile(binary_code, output_name);
+        File::WriteStringToFile(output_name, binary_code);
       }
       if (!output_header_name.empty())
       {
         const std::string header = CodeToHeader(code, input_name);
-        File::WriteStringToFile(header, output_header_name + ".h");
+        File::WriteStringToFile(output_header_name + ".h", header);
       }
     }
   }
@@ -400,21 +400,39 @@ int main(int argc, const char* argv[])
   {
     const std::string argument = argv[i];
     if (argument == "-d")
+    {
       disassemble = true;
+    }
     else if (argument == "-o")
-      output_name = argv[++i];
+    {
+      if (++i < argc)
+        output_name = argv[i];
+    }
     else if (argument == "-h")
-      output_header_name = argv[++i];
+    {
+      if (++i < argc)
+        output_header_name = argv[i];
+    }
     else if (argument == "-c")
+    {
       compare = true;
+    }
     else if (argument == "-s")
+    {
       outputSize = true;
+    }
     else if (argument == "-m")
+    {
       multiple = true;
+    }
     else if (argument == "-f")
+    {
       force = true;
+    }
     else if (argument == "-p")
+    {
       print_results = true;
+    }
     else if (argument == "-ps")
     {
       print_results = true;

@@ -4,6 +4,7 @@
 
 #include "VideoBackends/D3D/Render.h"
 
+#include <algorithm>
 #include <array>
 #include <cinttypes>
 #include <cmath>
@@ -26,6 +27,7 @@
 #include "VideoBackends/D3D/DXPipeline.h"
 #include "VideoBackends/D3D/DXShader.h"
 #include "VideoBackends/D3D/DXTexture.h"
+#include "VideoBackends/D3D/SwapChain.h"
 
 #include "VideoCommon/BPFunctions.h"
 #include "VideoCommon/FramebufferManager.h"
@@ -36,63 +38,19 @@
 
 namespace DX11
 {
-// Nvidia stereo blitting struct defined in "nvstereo.h" from the Nvidia SDK
-typedef struct _Nv_Stereo_Image_Header
+Renderer::Renderer(std::unique_ptr<SwapChain> swap_chain, float backbuffer_scale)
+    : ::Renderer(swap_chain ? swap_chain->GetWidth() : 0, swap_chain ? swap_chain->GetHeight() : 0,
+                 backbuffer_scale,
+                 swap_chain ? swap_chain->GetFormat() : AbstractTextureFormat::Undefined),
+      m_swap_chain(std::move(swap_chain))
 {
-  unsigned int dwSignature;
-  unsigned int dwWidth;
-  unsigned int dwHeight;
-  unsigned int dwBPP;
-  unsigned int dwFlags;
-} NVSTEREOIMAGEHEADER, *LPNVSTEREOIMAGEHEADER;
-
-#define NVSTEREO_IMAGE_SIGNATURE 0x4433564e
-
-Renderer::Renderer(int backbuffer_width, int backbuffer_height, float backbuffer_scale)
-    : ::Renderer(backbuffer_width, backbuffer_height, backbuffer_scale,
-                 AbstractTextureFormat::RGBA8)
-{
-  m_last_fullscreen_state = D3D::GetFullscreenState();
 }
 
 Renderer::~Renderer() = default;
 
-void Renderer::Create3DVisionTexture(int width, int height)
-{
-  // Create a staging texture for 3D vision with signature information in the last row.
-  // Nvidia 3D Vision supports full SBS, so there is no loss in resolution during this process.
-  NVSTEREOIMAGEHEADER header;
-  header.dwSignature = NVSTEREO_IMAGE_SIGNATURE;
-  header.dwWidth = static_cast<u32>(width * 2);
-  header.dwHeight = static_cast<u32>(height + 1);
-  header.dwBPP = 32;
-  header.dwFlags = 0;
-
-  const u32 pitch = static_cast<u32>(4 * width * 2);
-  const auto memory = std::make_unique<u8[]>((height + 1) * pitch);
-  u8* image_header_location = &memory[height * pitch];
-  std::memcpy(image_header_location, &header, sizeof(header));
-
-  D3D11_SUBRESOURCE_DATA sys_data;
-  sys_data.SysMemPitch = pitch;
-  sys_data.pSysMem = memory.get();
-
-  CD3D11_TEXTURE2D_DESC texture_desc(DXGI_FORMAT_R8G8B8A8_UNORM, width * 2, height + 1, 1, 1,
-                                     D3D11_BIND_RENDER_TARGET, D3D11_USAGE_DEFAULT, 0, 1, 0, 0);
-  ID3D11Texture2D* texture;
-  HRESULT hr = D3D::device->CreateTexture2D(&texture_desc, &sys_data, &texture);
-  CHECK(SUCCEEDED(hr), "Create 3D Vision Texture");
-  m_3d_vision_texture = std::make_unique<DXTexture>(TextureConfig(width * 2, height + 1, 1, 1, 1,
-                                                                  AbstractTextureFormat::RGBA8,
-                                                                  AbstractTextureFlag_RenderTarget),
-                                                    texture, nullptr, nullptr);
-  m_3d_vision_framebuffer =
-      DXFramebuffer::Create(static_cast<DXTexture*>(m_3d_vision_texture.get()), nullptr);
-}
-
 bool Renderer::IsHeadless() const
 {
-  return D3D::swapchain == nullptr;
+  return !m_swap_chain;
 }
 
 std::unique_ptr<AbstractTexture> Renderer::CreateTexture(const TextureConfig& config)
@@ -114,18 +72,24 @@ std::unique_ptr<AbstractFramebuffer> Renderer::CreateFramebuffer(AbstractTexture
 }
 
 std::unique_ptr<AbstractShader> Renderer::CreateShaderFromSource(ShaderStage stage,
-                                                                 const char* source, size_t length)
+                                                                 std::string_view source)
 {
-  return DXShader::CreateFromSource(stage, source, length);
+  auto bytecode = DXShader::CompileShader(D3D::feature_level, stage, source);
+  if (!bytecode)
+    return nullptr;
+
+  return DXShader::CreateFromBytecode(stage, std::move(*bytecode));
 }
 
 std::unique_ptr<AbstractShader> Renderer::CreateShaderFromBinary(ShaderStage stage,
                                                                  const void* data, size_t length)
 {
-  return DXShader::CreateFromBinary(stage, data, length);
+  return DXShader::CreateFromBytecode(stage, DXShader::CreateByteCode(data, length));
 }
 
-std::unique_ptr<AbstractPipeline> Renderer::CreatePipeline(const AbstractPipelineConfig& config)
+std::unique_ptr<AbstractPipeline> Renderer::CreatePipeline(const AbstractPipelineConfig& config,
+                                                           const void* cache_data,
+                                                           size_t cache_data_length)
 {
   return DXPipeline::Create(config);
 }
@@ -196,64 +160,42 @@ void Renderer::DispatchComputeShader(const AbstractShader* shader, u32 groups_x,
 
 void Renderer::BindBackbuffer(const ClearColor& clear_color)
 {
-  CheckForSurfaceChange();
-  CheckForSurfaceResize();
-  SetAndClearFramebuffer(D3D::GetSwapChainFramebuffer(), clear_color);
+  CheckForSwapChainChanges();
+  SetAndClearFramebuffer(m_swap_chain->GetFramebuffer(), clear_color);
 }
 
 void Renderer::PresentBackbuffer()
 {
-  D3D::Present();
+  m_swap_chain->Present();
 }
 
 void Renderer::OnConfigChanged(u32 bits)
 {
+  // Quad-buffer changes require swap chain recreation.
+  if (bits & CONFIG_CHANGE_BIT_STEREO_MODE && m_swap_chain)
+    m_swap_chain->SetStereo(SwapChain::WantsStereo());
 }
 
-void Renderer::CheckForSurfaceChange()
+void Renderer::CheckForSwapChainChanges()
 {
-  if (!m_surface_changed.TestAndClear())
+  const bool surface_changed = m_surface_changed.TestAndClear();
+  const bool surface_resized =
+      m_surface_resized.TestAndClear() || m_swap_chain->CheckForFullscreenChange();
+  if (!surface_changed && !surface_resized)
     return;
 
-  m_3d_vision_framebuffer.reset();
-  m_3d_vision_texture.reset();
-
-  D3D::Reset(reinterpret_cast<HWND>(m_new_surface_handle));
-  m_new_surface_handle = nullptr;
-
-  UpdateBackbufferSize();
-}
-
-void Renderer::CheckForSurfaceResize()
-{
-  const bool fullscreen_state = D3D::GetFullscreenState();
-  const bool exclusive_fullscreen_changed = fullscreen_state != m_last_fullscreen_state;
-  if (!m_surface_resized.TestAndClear() && !exclusive_fullscreen_changed)
-    return;
-
-  m_3d_vision_framebuffer.reset();
-  m_3d_vision_texture.reset();
-
-  m_last_fullscreen_state = fullscreen_state;
-  if (D3D::swapchain)
-    D3D::ResizeSwapChain();
-  UpdateBackbufferSize();
-}
-
-void Renderer::UpdateBackbufferSize()
-{
-  if (D3D::swapchain)
+  if (surface_changed)
   {
-    DXGI_SWAP_CHAIN_DESC1 desc = {};
-    D3D::swapchain->GetDesc1(&desc);
-    m_backbuffer_width = std::max(desc.Width, 1u);
-    m_backbuffer_height = std::max(desc.Height, 1u);
+    m_swap_chain->ChangeSurface(m_new_surface_handle);
+    m_new_surface_handle = nullptr;
   }
   else
   {
-    m_backbuffer_width = 1;
-    m_backbuffer_height = 1;
+    m_swap_chain->ResizeSwapChain();
   }
+
+  m_backbuffer_width = m_swap_chain->GetWidth();
+  m_backbuffer_height = m_swap_chain->GetHeight();
 }
 
 void Renderer::SetFramebuffer(AbstractFramebuffer* framebuffer)
@@ -324,40 +266,11 @@ void Renderer::UnbindTexture(const AbstractTexture* texture)
 
 u16 Renderer::BBoxRead(int index)
 {
-  // Here we get the min/max value of the truncated position of the upscaled framebuffer.
-  // So we have to correct them to the unscaled EFB sizes.
-  int value = BBox::Get(index);
-
-  if (index < 2)
-  {
-    // left/right
-    value = value * EFB_WIDTH / m_target_width;
-  }
-  else
-  {
-    // up/down
-    value = value * EFB_HEIGHT / m_target_height;
-  }
-  if (index & 1)
-    value++;  // fix max values to describe the outer border
-
-  return value;
+  return static_cast<u16>(BBox::Get(index));
 }
 
-void Renderer::BBoxWrite(int index, u16 _value)
+void Renderer::BBoxWrite(int index, u16 value)
 {
-  int value = _value;  // u16 isn't enough to multiply by the efb width
-  if (index & 1)
-    value--;
-  if (index < 2)
-  {
-    value = value * m_target_width / EFB_WIDTH;
-  }
-  else
-  {
-    value = value * m_target_height / EFB_HEIGHT;
-  }
-
   BBox::Set(index, value);
 }
 
@@ -372,42 +285,15 @@ void Renderer::WaitForGPUIdle()
   D3D::context->Flush();
 }
 
-void Renderer::RenderXFBToScreen(const AbstractTexture* texture, const EFBRectangle& rc)
-{
-  if (g_ActiveConfig.stereo_mode != StereoMode::Nvidia3DVision)
-    return ::Renderer::RenderXFBToScreen(texture, rc);
-
-  if (!m_3d_vision_texture)
-    Create3DVisionTexture(m_backbuffer_width, m_backbuffer_height);
-
-  // Render to staging texture which is double the width of the backbuffer
-  SetAndClearFramebuffer(m_3d_vision_framebuffer.get());
-
-  const auto target_rc = GetTargetRectangle();
-  m_post_processor->BlitFromTexture(target_rc, rc, texture, 0);
-  m_post_processor->BlitFromTexture(
-      MathUtil::Rectangle<int>(target_rc.left + m_backbuffer_width, target_rc.top,
-                               target_rc.right + m_backbuffer_width, target_rc.bottom),
-      rc, texture, 1);
-
-  // Copy the left eye to the backbuffer, if Nvidia 3D Vision is enabled it should
-  // recognize the signature and automatically include the right eye frame.
-  const CD3D11_BOX box(0, 0, 0, m_backbuffer_width, m_backbuffer_height, 1);
-  D3D::context->CopySubresourceRegion(D3D::GetSwapChainTexture()->GetD3DTexture(), 0, 0, 0, 0,
-                                      m_3d_vision_texture->GetD3DTexture(), 0, &box);
-
-  // Restore render target to backbuffer
-  SetFramebuffer(D3D::GetSwapChainFramebuffer());
-}
-
 void Renderer::SetFullscreen(bool enable_fullscreen)
 {
-  D3D::SetFullscreenState(enable_fullscreen);
+  if (m_swap_chain)
+    m_swap_chain->SetFullscreen(enable_fullscreen);
 }
 
 bool Renderer::IsFullscreen() const
 {
-  return D3D::GetFullscreenState();
+  return m_swap_chain && m_swap_chain->GetFullscreen();
 }
 
 }  // namespace DX11

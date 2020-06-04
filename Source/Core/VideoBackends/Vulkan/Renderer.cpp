@@ -95,9 +95,9 @@ std::unique_ptr<AbstractStagingTexture> Renderer::CreateStagingTexture(StagingTe
 }
 
 std::unique_ptr<AbstractShader> Renderer::CreateShaderFromSource(ShaderStage stage,
-                                                                 const char* source, size_t length)
+                                                                 std::string_view source)
 {
-  return VKShader::CreateFromSource(stage, source, length);
+  return VKShader::CreateFromSource(stage, source);
 }
 
 std::unique_ptr<AbstractShader> Renderer::CreateShaderFromBinary(ShaderStage stage,
@@ -112,7 +112,9 @@ Renderer::CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl)
   return std::make_unique<VertexFormat>(vtx_decl);
 }
 
-std::unique_ptr<AbstractPipeline> Renderer::CreatePipeline(const AbstractPipelineConfig& config)
+std::unique_ptr<AbstractPipeline> Renderer::CreatePipeline(const AbstractPipelineConfig& config,
+                                                           const void* cache_data,
+                                                           size_t cache_data_length)
 {
   return VKPipeline::Create(config);
 }
@@ -131,49 +133,12 @@ void Renderer::SetPipeline(const AbstractPipeline* pipeline)
 
 u16 Renderer::BBoxRead(int index)
 {
-  s32 value = m_bounding_box->Get(static_cast<size_t>(index));
-
-  // Here we get the min/max value of the truncated position of the upscaled framebuffer.
-  // So we have to correct them to the unscaled EFB sizes.
-  if (index < 2)
-  {
-    // left/right
-    value = value * EFB_WIDTH / m_target_width;
-  }
-  else
-  {
-    // up/down
-    value = value * EFB_HEIGHT / m_target_height;
-  }
-
-  // fix max values to describe the outer border
-  if (index & 1)
-    value++;
-
-  return static_cast<u16>(value);
+  return static_cast<u16>(m_bounding_box->Get(index));
 }
 
 void Renderer::BBoxWrite(int index, u16 value)
 {
-  s32 scaled_value = static_cast<s32>(value);
-
-  // fix max values to describe the outer border
-  if (index & 1)
-    scaled_value--;
-
-  // scale to internal resolution
-  if (index < 2)
-  {
-    // left/right
-    scaled_value = scaled_value * m_target_width / EFB_WIDTH;
-  }
-  else
-  {
-    // up/down
-    scaled_value = scaled_value * m_target_height / EFB_HEIGHT;
-  }
-
-  m_bounding_box->Set(static_cast<size_t>(index), scaled_value);
+  m_bounding_box->Set(index, value);
 }
 
 void Renderer::BBoxFlush()
@@ -182,14 +147,14 @@ void Renderer::BBoxFlush()
   m_bounding_box->Invalidate();
 }
 
-void Renderer::ClearScreen(const EFBRectangle& rc, bool color_enable, bool alpha_enable,
+void Renderer::ClearScreen(const MathUtil::Rectangle<int>& rc, bool color_enable, bool alpha_enable,
                            bool z_enable, u32 color, u32 z)
 {
   g_framebuffer_manager->FlushEFBPokes();
-  g_framebuffer_manager->InvalidatePeekCache();
+  g_framebuffer_manager->FlagPeekCacheAsOutOfDate();
 
   // Native -> EFB coordinates
-  TargetRectangle target_rc = Renderer::ConvertEFBRectangle(rc);
+  MathUtil::Rectangle<int> target_rc = Renderer::ConvertEFBRectangle(rc);
 
   // Size we pass this size to vkBeginRenderPass, it has to be clamped to the framebuffer
   // dimensions. The other backends just silently ignore this case.
@@ -315,13 +280,40 @@ void Renderer::BindBackbuffer(const ClearColor& clear_color)
   CheckForSurfaceChange();
   CheckForSurfaceResize();
 
-  VkResult res = g_command_buffer_mgr->CheckLastPresentFail() ? VK_ERROR_OUT_OF_DATE_KHR :
-                                                                m_swap_chain->AcquireNextImage();
-  if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+  // Check for exclusive fullscreen request.
+  if (m_swap_chain->GetCurrentFullscreenState() != m_swap_chain->GetNextFullscreenState() &&
+      !m_swap_chain->SetFullscreenState(m_swap_chain->GetNextFullscreenState()))
+  {
+    // if it fails, don't keep trying
+    m_swap_chain->SetNextFullscreenState(m_swap_chain->GetCurrentFullscreenState());
+  }
+
+  VkResult res = g_command_buffer_mgr->CheckLastPresentFail() ?
+                     g_command_buffer_mgr->GetLastPresentResult() :
+                     m_swap_chain->AcquireNextImage();
+  if (res != VK_SUCCESS)
   {
     // Execute cmdbuffer before resizing, as the last frame could still be presenting.
     ExecuteCommandBuffer(false, true);
-    m_swap_chain->ResizeSwapChain();
+
+    // Was this a lost exclusive fullscreen?
+    if (res == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+    {
+      // The present keeps returning exclusive mode lost unless we re-create the swap chain.
+      INFO_LOG(VIDEO, "Lost exclusive fullscreen.");
+      m_swap_chain->RecreateSwapChain();
+    }
+    else if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+      INFO_LOG(VIDEO, "Resizing swap chain due to suboptimal/out-of-date");
+      m_swap_chain->ResizeSwapChain();
+    }
+    else
+    {
+      ERROR_LOG(VIDEO, "Unknown present error 0x%08X, please report.", res);
+      m_swap_chain->RecreateSwapChain();
+    }
+
     res = m_swap_chain->AcquireNextImage();
   }
   if (res != VK_SUCCESS)
@@ -341,7 +333,6 @@ void Renderer::PresentBackbuffer()
 {
   // End drawing to backbuffer
   StateTracker::GetInstance()->EndRenderPass();
-  PerfQuery::GetInstance()->FlushQueries();
 
   // Transition the backbuffer to PRESENT_SRC to ensure all commands drawing
   // to it have finished before present.
@@ -352,23 +343,31 @@ void Renderer::PresentBackbuffer()
   // Because this final command buffer is rendering to the swap chain, we need to wait for
   // the available semaphore to be signaled before executing the buffer. This final submission
   // can happen off-thread in the background while we're preparing the next frame.
-  g_command_buffer_mgr->SubmitCommandBuffer(true, m_swap_chain->GetSwapChain(),
+  g_command_buffer_mgr->SubmitCommandBuffer(true, false, m_swap_chain->GetSwapChain(),
                                             m_swap_chain->GetCurrentImageIndex());
 
   // New cmdbuffer, so invalidate state.
   StateTracker::GetInstance()->InvalidateCachedState();
 }
 
+void Renderer::SetFullscreen(bool enable_fullscreen)
+{
+  if (!m_swap_chain->IsFullscreenSupported())
+    return;
+
+  m_swap_chain->SetNextFullscreenState(enable_fullscreen);
+}
+
+bool Renderer::IsFullscreen() const
+{
+  return m_swap_chain && m_swap_chain->GetCurrentFullscreenState();
+}
+
 void Renderer::ExecuteCommandBuffer(bool submit_off_thread, bool wait_for_completion)
 {
   StateTracker::GetInstance()->EndRenderPass();
-  PerfQuery::GetInstance()->FlushQueries();
 
-  // If we're waiting for completion, don't bother waking the worker thread.
-  const VkFence pending_fence = g_command_buffer_mgr->GetCurrentCommandBufferFence();
-  g_command_buffer_mgr->SubmitCommandBuffer(submit_off_thread && wait_for_completion);
-  if (wait_for_completion)
-    g_command_buffer_mgr->WaitForFence(pending_fence);
+  g_command_buffer_mgr->SubmitCommandBuffer(submit_off_thread, wait_for_completion);
 
   StateTracker::GetInstance()->InvalidateCachedState();
 }
@@ -587,10 +586,6 @@ void Renderer::UnbindTexture(const AbstractTexture* texture)
 
 void Renderer::ResetSamplerStates()
 {
-  // Ensure none of the sampler objects are in use.
-  // This assumes that none of the samplers are in use on the command list currently being recorded.
-  g_command_buffer_mgr->WaitForGPUIdle();
-
   // Invalidate all sampler states, next draw will re-initialize them.
   for (u32 i = 0; i < m_sampler_states.size(); i++)
   {
@@ -606,6 +601,19 @@ void Renderer::SetScissorRect(const MathUtil::Rectangle<int>& rc)
 {
   VkRect2D scissor = {{rc.left, rc.top},
                       {static_cast<u32>(rc.GetWidth()), static_cast<u32>(rc.GetHeight())}};
+
+  // See Vulkan spec for vkCmdSetScissor:
+  // The x and y members of offset must be greater than or equal to 0.
+  if (scissor.offset.x < 0)
+  {
+    scissor.extent.width -= -scissor.offset.x;
+    scissor.offset.x = 0;
+  }
+  if (scissor.offset.y < 0)
+  {
+    scissor.extent.height -= -scissor.offset.y;
+    scissor.offset.y = 0;
+  }
   StateTracker::GetInstance()->SetScissor(scissor);
 }
 

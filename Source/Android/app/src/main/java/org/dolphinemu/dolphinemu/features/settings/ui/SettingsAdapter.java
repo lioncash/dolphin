@@ -4,14 +4,17 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.RecyclerView;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import org.dolphinemu.dolphinemu.NativeLibrary;
 import org.dolphinemu.dolphinemu.R;
 import org.dolphinemu.dolphinemu.dialogs.MotionAlertDialog;
 import org.dolphinemu.dolphinemu.features.settings.model.BooleanSetting;
@@ -20,14 +23,18 @@ import org.dolphinemu.dolphinemu.features.settings.model.IntSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.Settings;
 import org.dolphinemu.dolphinemu.features.settings.model.StringSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.view.CheckBoxSetting;
+import org.dolphinemu.dolphinemu.features.settings.model.view.FilePicker;
 import org.dolphinemu.dolphinemu.features.settings.model.view.InputBindingSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.view.RumbleBindingSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.view.SettingsItem;
 import org.dolphinemu.dolphinemu.features.settings.model.view.SingleChoiceSetting;
+import org.dolphinemu.dolphinemu.features.settings.model.view.SingleChoiceSettingDynamicDescriptions;
 import org.dolphinemu.dolphinemu.features.settings.model.view.SliderSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.view.StringSingleChoiceSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.view.SubmenuSetting;
 import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.CheckBoxSettingViewHolder;
+import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.ConfirmRunnableViewHolder;
+import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.FilePickerViewHolder;
 import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.HeaderViewHolder;
 import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.InputBindingSettingViewHolder;
 import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.RumbleBindingViewHolder;
@@ -36,14 +43,19 @@ import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.SingleChoiceVie
 import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.SliderViewHolder;
 import org.dolphinemu.dolphinemu.features.settings.ui.viewholder.SubmenuViewHolder;
 import org.dolphinemu.dolphinemu.features.settings.utils.SettingsFile;
+import org.dolphinemu.dolphinemu.ui.main.MainPresenter;
+import org.dolphinemu.dolphinemu.utils.FileBrowserHelper;
 import org.dolphinemu.dolphinemu.utils.Log;
 
+import java.security.InvalidParameterException;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolder>
         implements DialogInterface.OnClickListener, SeekBar.OnSeekBarChangeListener
 {
   private SettingsFragmentView mView;
+  private static SettingsFragmentView sView;
   private Context mContext;
   private ArrayList<SettingsItem> mSettings;
 
@@ -54,9 +66,14 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
   private AlertDialog mDialog;
   private TextView mTextSliderValue;
 
+  // TODO: Properly restore these two on activity recreation
+  private static FilePicker sFilePicker;
+  private static SettingsItem sItem;
+
   public SettingsAdapter(SettingsFragmentView view, Context context)
   {
     mView = view;
+    sView = view;
     mContext = context;
     mClickedPosition = -1;
   }
@@ -78,6 +95,7 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
         return new CheckBoxSettingViewHolder(view, this);
 
       case SettingsItem.TYPE_STRING_SINGLE_CHOICE:
+      case SettingsItem.TYPE_SINGLE_CHOICE_DYNAMIC_DESCRIPTIONS:
       case SettingsItem.TYPE_SINGLE_CHOICE:
         view = inflater.inflate(R.layout.list_item_setting, parent, false);
         return new SingleChoiceViewHolder(view, this);
@@ -87,7 +105,7 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
         return new SliderViewHolder(view, this);
 
       case SettingsItem.TYPE_SUBMENU:
-        view = inflater.inflate(R.layout.list_item_setting, parent, false);
+        view = inflater.inflate(R.layout.list_item_setting_submenu, parent, false);
         return new SubmenuViewHolder(view, this);
 
       case SettingsItem.TYPE_INPUT_BINDING:
@@ -97,6 +115,14 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
       case SettingsItem.TYPE_RUMBLE_BINDING:
         view = inflater.inflate(R.layout.list_item_setting, parent, false);
         return new RumbleBindingViewHolder(view, this, mContext);
+
+      case SettingsItem.TYPE_FILE_PICKER:
+        view = inflater.inflate(R.layout.list_item_setting, parent, false);
+        return new FilePickerViewHolder(view, this);
+
+      case SettingsItem.TYPE_CONFIRM_RUNNABLE:
+        view = inflater.inflate(R.layout.list_item_setting, parent, false);
+        return new ConfirmRunnableViewHolder(view, this, mContext, mView);
 
       default:
         Log.error("[SettingsAdapter] Invalid view type: " + viewType);
@@ -166,7 +192,8 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
 
     int value = getSelectionForSingleChoiceValue(item);
 
-    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity());
+    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity(),
+            R.style.DolphinDialogBase);
 
     builder.setTitle(item.getNameId());
     builder.setSingleChoiceItems(item.getChoicesId(), value, this);
@@ -179,10 +206,28 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
     mClickedItem = item;
     mClickedPosition = position;
 
-    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity());
+    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity(),
+            R.style.DolphinDialogBase);
 
     builder.setTitle(item.getNameId());
     builder.setSingleChoiceItems(item.getChoicesId(), item.getSelectValueIndex(), this);
+
+    mDialog = builder.show();
+  }
+
+  public void onSingleChoiceDynamicDescriptionsClick(SingleChoiceSettingDynamicDescriptions item,
+          int position)
+  {
+    mClickedItem = item;
+    mClickedPosition = position;
+
+    int value = getSelectionForSingleChoiceDynamicDescriptionsValue(item);
+
+    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity(),
+            R.style.DolphinDialogBase);
+
+    builder.setTitle(item.getNameId());
+    builder.setSingleChoiceItems(item.getChoicesId(), value, this);
 
     mDialog = builder.show();
   }
@@ -192,7 +237,8 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
     mClickedItem = item;
     mClickedPosition = position;
     mSeekbarProgress = item.getSelectedValue();
-    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity());
+    AlertDialog.Builder builder = new AlertDialog.Builder(mView.getActivity(),
+            R.style.DolphinDialogBase);
 
     LayoutInflater inflater = LayoutInflater.from(mView.getActivity());
     View view = inflater.inflate(R.layout.dialog_seekbar, null);
@@ -254,6 +300,75 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
     dialog.show();
   }
 
+  public void onFilePickerDirectoryClick(SettingsItem item)
+  {
+    sFilePicker = (FilePicker) item;
+    sItem = item;
+
+    FileBrowserHelper.openDirectoryPicker(mView.getActivity(), FileBrowserHelper.GAME_EXTENSIONS);
+  }
+
+  public void onFilePickerFileClick(SettingsItem item)
+  {
+    sFilePicker = (FilePicker) item;
+    sItem = item;
+
+    HashSet<String> extensions;
+    switch (sFilePicker.getRequestType())
+    {
+      case MainPresenter.REQUEST_SD_FILE:
+        extensions = FileBrowserHelper.RAW_EXTENSION;
+        break;
+      case MainPresenter.REQUEST_GAME_FILE:
+        extensions = FileBrowserHelper.GAME_EXTENSIONS;
+        break;
+      case MainPresenter.REQUEST_WAD_FILE:
+        extensions = FileBrowserHelper.WAD_EXTENSION;
+        break;
+      default:
+        throw new InvalidParameterException("Unhandled request code");
+    }
+
+    FileBrowserHelper.openFilePicker(mView.getActivity(), sFilePicker.getRequestType(), false,
+            extensions);
+  }
+
+  public static void onFilePickerConfirmation(String file)
+  {
+    NativeLibrary.SetConfig(sFilePicker.getFile(), sItem.getSection(), sItem.getKey(), file);
+    NativeLibrary.ReloadConfig();
+  }
+
+  public static void resetPaths()
+  {
+    StringSetting defaultISO =
+            new StringSetting(SettingsFile.KEY_DEFAULT_ISO, Settings.SECTION_INI_CORE, "");
+    StringSetting NANDRootPath =
+            new StringSetting(SettingsFile.KEY_NAND_ROOT_PATH, Settings.SECTION_INI_GENERAL,
+                    SettingsFragmentPresenter.getDefaultNANDRootPath());
+    StringSetting dumpPath =
+            new StringSetting(SettingsFile.KEY_DUMP_PATH, Settings.SECTION_INI_GENERAL,
+                    SettingsFragmentPresenter.getDefaultDumpPath());
+    StringSetting loadPath =
+            new StringSetting(SettingsFile.KEY_LOAD_PATH, Settings.SECTION_INI_GENERAL,
+                    SettingsFragmentPresenter.getDefaultLoadPath());
+    StringSetting resourcePackPath =
+            new StringSetting(SettingsFile.KEY_RESOURCE_PACK_PATH, Settings.SECTION_INI_GENERAL,
+                    SettingsFragmentPresenter.getDefaultResourcePackPath());
+    StringSetting sdPath =
+            new StringSetting(SettingsFile.KEY_WII_SD_CARD_PATH, Settings.SECTION_INI_GENERAL,
+                    SettingsFragmentPresenter.getDefaultSDPath());
+
+    sView.putSetting(defaultISO);
+    sView.putSetting(NANDRootPath);
+    sView.putSetting(dumpPath);
+    sView.putSetting(loadPath);
+    sView.putSetting(resourcePackPath);
+    sView.putSetting(sdPath);
+
+    sView.onSettingChanged();
+  }
+
   @Override
   public void onClick(DialogInterface dialog, int which)
   {
@@ -308,6 +423,24 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
                           .getNumericValue(scSetting.getKey().charAt(scSetting.getKey().length() - 1)),
                   true);
         }
+      }
+
+      closeDialog();
+    }
+    else if (mClickedItem instanceof SingleChoiceSettingDynamicDescriptions)
+    {
+      SingleChoiceSettingDynamicDescriptions scSetting =
+              (SingleChoiceSettingDynamicDescriptions) mClickedItem;
+
+      int value = getValueForSingleChoiceDynamicDescriptionsSelection(scSetting, which);
+      if (scSetting.getSelectedValue() != value)
+        mView.onSettingChanged();
+
+      // Get the backing Setting, which may be null (if for example it was missing from the file)
+      IntSetting setting = scSetting.setSelectedValue(value);
+      if (setting != null)
+      {
+        mView.putSetting(setting);
       }
 
       closeDialog();
@@ -415,6 +548,48 @@ public final class SettingsAdapter extends RecyclerView.Adapter<SettingViewHolde
   }
 
   private int getSelectionForSingleChoiceValue(SingleChoiceSetting item)
+  {
+    int value = item.getSelectedValue();
+    int valuesId = item.getValuesId();
+
+    if (valuesId > 0)
+    {
+      int[] valuesArray = mContext.getResources().getIntArray(valuesId);
+      for (int index = 0; index < valuesArray.length; index++)
+      {
+        int current = valuesArray[index];
+        if (current == value)
+        {
+          return index;
+        }
+      }
+    }
+    else
+    {
+      return value;
+    }
+
+    return -1;
+  }
+
+  private int getValueForSingleChoiceDynamicDescriptionsSelection(
+          SingleChoiceSettingDynamicDescriptions item, int which)
+  {
+    int valuesId = item.getValuesId();
+
+    if (valuesId > 0)
+    {
+      int[] valuesArray = mContext.getResources().getIntArray(valuesId);
+      return valuesArray[which];
+    }
+    else
+    {
+      return which;
+    }
+  }
+
+  private int getSelectionForSingleChoiceDynamicDescriptionsValue(
+          SingleChoiceSettingDynamicDescriptions item)
   {
     int value = item.getSelectedValue();
     int valuesId = item.getValuesId();

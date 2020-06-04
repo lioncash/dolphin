@@ -19,8 +19,6 @@
 #include "Common/Flag.h"
 #include "Common/Semaphore.h"
 
-#include "VideoCommon/VideoCommon.h"
-
 #include "VideoBackends/Vulkan/Constants.h"
 
 namespace Vulkan
@@ -51,9 +49,15 @@ public:
   // Allocates a descriptors set from the pool reserved for the current frame.
   VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout set_layout);
 
+  // Fence "counters" are used to track which commands have been completed by the GPU.
+  // If the last completed fence counter is greater or equal to N, it means that the work
+  // associated counter N has been completed by the GPU. The value of N to associate with
+  // commands can be retreived by calling GetCurrentFenceCounter().
+  u64 GetCompletedFenceCounter() const { return m_completed_fence_counter; }
+
   // Gets the fence that will be signaled when the currently executing command buffer is
   // queued and executed. Do not wait for this fence before the buffer is executed.
-  VkFence GetCurrentCommandBufferFence() const { return m_frame_resources[m_current_frame].fence; }
+  u64 GetCurrentFenceCounter() const { return m_frame_resources[m_current_frame].fence_counter; }
 
   // Returns the semaphore for the current command buffer, which can be used to ensure the
   // swap chain image is ready before the command buffer executes.
@@ -66,20 +70,17 @@ public:
   // Ensure that the worker thread has submitted any previous command buffers and is idle.
   void WaitForWorkerThreadIdle();
 
-  // Ensure that the worker thread has both submitted all commands, and the GPU has caught up.
-  // Use with caution, huge performance penalty.
-  void WaitForGPUIdle();
-
   // Wait for a fence to be completed.
   // Also invokes callbacks for completion.
-  void WaitForFence(VkFence fence);
+  void WaitForFenceCounter(u64 fence_counter);
 
-  void SubmitCommandBuffer(bool submit_on_worker_thread,
+  void SubmitCommandBuffer(bool submit_on_worker_thread, bool wait_for_completion,
                            VkSwapchainKHR present_swap_chain = VK_NULL_HANDLE,
                            uint32_t present_image_index = 0xFFFFFFFF);
 
   // Was the last present submitted to the queue a failure? If so, we must recreate our swapchain.
-  bool CheckLastPresentFail() { return m_present_failed_flag.TestAndClear(); }
+  bool CheckLastPresentFail() { return m_last_present_failed.TestAndClear(); }
+  VkResult GetLastPresentResult() const { return m_last_present_result; }
 
   // Schedule a vulkan resource for destruction later on. This will occur when the command buffer
   // is next re-used, and the GPU has finished working with the specified resource.
@@ -90,24 +91,16 @@ public:
   void DeferImageDestruction(VkImage object);
   void DeferImageViewDestruction(VkImageView object);
 
-  // Instruct the manager to fire the specified callback when a fence is flagged to be signaled.
-  // This happens when command buffers are executed, and can be tested if signaled, which means
-  // that all commands up to the point when the callback was fired have completed.
-  using FenceSignaledCallback = std::function<void(VkFence)>;
-  void AddFenceSignaledCallback(const void* key, FenceSignaledCallback callback);
-  void RemoveFenceSignaledCallback(const void* key);
-
 private:
   bool CreateCommandBuffers();
   void DestroyCommandBuffers();
 
   bool CreateSubmitThread();
 
+  void WaitForCommandBufferCompletion(u32 command_buffer_index);
   void SubmitCommandBuffer(u32 command_buffer_index, VkSwapchainKHR present_swap_chain,
                            u32 present_image_index);
   void BeginCommandBuffer();
-
-  void OnCommandBufferExecuted(u32 index);
 
   struct FrameResources
   {
@@ -117,18 +110,18 @@ private:
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
     VkFence fence = VK_NULL_HANDLE;
     VkSemaphore semaphore = VK_NULL_HANDLE;
+    u64 fence_counter = 0;
     bool init_command_buffer_used = false;
     bool semaphore_used = false;
-    bool needs_fence_wait = false;
 
     std::vector<std::function<void()>> cleanup_resources;
   };
 
+  u64 m_next_fence_counter = 1;
+  u64 m_completed_fence_counter = 0;
+
   std::array<FrameResources, NUM_COMMAND_BUFFERS> m_frame_resources;
   u32 m_current_frame;
-
-  // callbacks when a fence point is set
-  std::map<const void*, FenceSignaledCallback> m_fence_callbacks;
 
   // Threaded command buffer execution
   // Semaphore determines when a command buffer can be queued
@@ -144,7 +137,8 @@ private:
   VkSemaphore m_present_semaphore = VK_NULL_HANDLE;
   std::deque<PendingCommandBufferSubmit> m_pending_submits;
   std::mutex m_pending_submit_lock;
-  Common::Flag m_present_failed_flag;
+  Common::Flag m_last_present_failed;
+  VkResult m_last_present_result = VK_SUCCESS;
   bool m_use_threaded_submission = false;
 };
 

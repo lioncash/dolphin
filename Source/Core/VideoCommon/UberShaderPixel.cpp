@@ -3,10 +3,15 @@
 // Refer to the license.txt file included.
 
 #include "VideoCommon/UberShaderPixel.h"
+
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/DriverDetails.h"
 #include "VideoCommon/NativeVertexFormat.h"
+#include "VideoCommon/PixelShaderGen.h"
+#include "VideoCommon/ShaderGenCommon.h"
 #include "VideoCommon/UberShaderCommon.h"
+#include "VideoCommon/VideoCommon.h"
+#include "VideoCommon/VideoConfig.h"
 #include "VideoCommon/XFMemory.h"
 
 namespace UberShader
@@ -14,8 +19,8 @@ namespace UberShader
 PixelShaderUid GetPixelShaderUid()
 {
   PixelShaderUid out;
-  pixel_ubershader_uid_data* uid_data = out.GetUidData<pixel_ubershader_uid_data>();
-  memset(uid_data, 0, sizeof(*uid_data));
+
+  pixel_ubershader_uid_data* const uid_data = out.GetUidData();
   uid_data->num_texgens = xfmem.numTexGen.numTexGens;
   uid_data->early_depth =
       bpmem.UseEarlyDepthTest() &&
@@ -26,13 +31,14 @@ PixelShaderUid GetPixelShaderUid()
       (!g_ActiveConfig.bFastDepthCalc && bpmem.zmode.testenable && !uid_data->early_depth) ||
       (bpmem.zmode.testenable && bpmem.genMode.zfreeze);
   uid_data->uint_output = bpmem.blendmode.UseLogicOp();
+
   return out;
 }
 
 void ClearUnusedPixelShaderUidBits(APIType ApiType, const ShaderHostConfig& host_config,
                                    PixelShaderUid* uid)
 {
-  pixel_ubershader_uid_data* uid_data = uid->GetUidData<pixel_ubershader_uid_data>();
+  pixel_ubershader_uid_data* const uid_data = uid->GetUidData();
 
   // OpenGL and Vulkan convert implicitly normalized color outputs to their uint representation.
   // Therefore, it is not necessary to use a uint output on these backends. We also disable the
@@ -1250,24 +1256,9 @@ ShaderCode GenPixelShader(APIType ApiType, const ShaderHostConfig& host_config,
 
   if (bounding_box)
   {
-    out.Write("  if (bpmem_bounding_box) {\n");
-    if (ApiType == APIType::D3D)
-    {
-      out.Write(
-          "    if(bbox_data[0] > int(rawpos.x)) InterlockedMin(bbox_data[0], int(rawpos.x));\n"
-          "    if(bbox_data[1] < int(rawpos.x)) InterlockedMax(bbox_data[1], int(rawpos.x));\n"
-          "    if(bbox_data[2] > int(rawpos.y)) InterlockedMin(bbox_data[2], int(rawpos.y));\n"
-          "    if(bbox_data[3] < int(rawpos.y)) InterlockedMax(bbox_data[3], int(rawpos.y));\n");
-    }
-    else
-    {
-      out.Write("\tif(bbox_left > int(rawpos.x)) atomicMin(bbox_left, int(rawpos.x));\n"
-                "\tif(bbox_right < int(rawpos.x)) atomicMax(bbox_right, int(rawpos.x));\n"
-                "\tif(bbox_top > int(rawpos.y)) atomicMin(bbox_top, int(rawpos.y));\n"
-                "\tif(bbox_bottom < int(rawpos.y)) atomicMax(bbox_bottom, int(rawpos.y));\n");
-    }
-
-    out.Write("  }\n");
+    out.Write("  if (bpmem_bounding_box) {\n"
+              "    UpdateBoundingBox(rawpos.xy);\n"
+              "  }\n");
   }
 
   if (use_shader_blend)
@@ -1405,11 +1396,10 @@ ShaderCode GenPixelShader(APIType ApiType, const ShaderHostConfig& host_config,
 void EnumeratePixelShaderUids(const std::function<void(const PixelShaderUid&)>& callback)
 {
   PixelShaderUid uid;
-  std::memset(&uid, 0, sizeof(uid));
 
   for (u32 texgens = 0; texgens <= 8; texgens++)
   {
-    auto* puid = uid.GetUidData<UberShader::pixel_ubershader_uid_data>();
+    pixel_ubershader_uid_data* const puid = uid.GetUidData();
     puid->num_texgens = texgens;
 
     for (u32 early_depth = 0; early_depth < 2; early_depth++)

@@ -75,26 +75,27 @@ public:
 
   FifoDataFile* GetFile() const { return m_File.get(); }
   u32 GetFrameObjectCount() const;
+  u32 GetMaxObjectCount() const;
   u32 GetCurrentFrameNum() const { return m_CurrentFrame; }
   const AnalyzedFrameInfo& GetAnalyzedFrameInfo(u32 frame) const { return m_FrameInfo[frame]; }
   // Frame range
   u32 GetFrameRangeStart() const { return m_FrameRangeStart; }
-  void SetFrameRangeStart(u32 start);
+  void SetFrameRangeStart(s32 start);
 
   u32 GetFrameRangeEnd() const { return m_FrameRangeEnd; }
-  void SetFrameRangeEnd(u32 end);
+  void SetFrameRangeEnd(s32 end);
 
   // Object range
-  u32 GetObjectRangeStart() const { return m_ObjectRangeStart; }
-  void SetObjectRangeStart(u32 start) { m_ObjectRangeStart = start; }
-  u32 GetObjectRangeEnd() const { return m_ObjectRangeEnd; }
-  void SetObjectRangeEnd(u32 end) { m_ObjectRangeEnd = end; }
+  s32 GetObjectRangeStart() const { return m_ObjectRangeStart; }
+  void SetObjectRangeStart(s32 start) { m_ObjectRangeStart = start; }
+  s32 GetObjectRangeEnd() const { return m_ObjectRangeEnd; }
+  void SetObjectRangeEnd(s32 end) { m_ObjectRangeEnd = end; }
   // If enabled then all memory updates happen at once before the first frame
   // Default is disabled
   void SetEarlyMemoryUpdates(bool enabled) { m_EarlyMemoryUpdates = enabled; }
   // Callbacks
-  void SetFileLoadedCallback(CallbackFunc callback) { m_FileLoadedCb = callback; }
-  void SetFrameWrittenCallback(CallbackFunc callback) { m_FrameWrittenCb = callback; }
+  void SetFileLoadedCallback(CallbackFunc callback);
+  void SetFrameWrittenCallback(CallbackFunc callback) { m_FrameWrittenCb = std::move(callback); }
   static FifoPlayer& GetInstance();
 
   bool IsRunningWithFakeVideoInterfaceUpdates() const;
@@ -140,12 +141,12 @@ private:
 
   bool m_Loop;
 
-  u32 m_CurrentFrame = 0;
-  u32 m_FrameRangeStart = 0;
-  u32 m_FrameRangeEnd = 0;
+  s32 m_CurrentFrame = 0;
+  s32 m_FrameRangeStart = 0;
+  s32 m_FrameRangeEnd = -1;
 
-  u32 m_ObjectRangeStart = 0;
-  u32 m_ObjectRangeEnd = 10000;
+  s32 m_ObjectRangeStart = 0;
+  s32 m_ObjectRangeEnd = 10000;
 
   bool m_EarlyMemoryUpdates = false;
 

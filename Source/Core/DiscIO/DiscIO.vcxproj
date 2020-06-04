@@ -1,9 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
@@ -12,12 +20,12 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{160BDC25-5626-4B0D-BDD8-2953D9777FB5}</ProjectGuid>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
@@ -48,15 +56,17 @@
     <ClCompile Include="Filesystem.cpp" />
     <ClCompile Include="FileSystemGCWii.cpp" />
     <ClCompile Include="NANDImporter.cpp" />
+    <ClCompile Include="ScrubbedBlob.cpp" />
     <ClCompile Include="TGCBlob.cpp" />
     <ClCompile Include="Volume.cpp" />
     <ClCompile Include="VolumeFileBlobReader.cpp" />
     <ClCompile Include="VolumeGC.cpp" />
+    <ClCompile Include="VolumeVerifier.cpp" />
     <ClCompile Include="VolumeWad.cpp" />
     <ClCompile Include="VolumeWii.cpp" />
     <ClCompile Include="WbfsBlob.cpp" />
+    <ClCompile Include="WiiEncryptionCache.cpp" />
     <ClCompile Include="WiiSaveBanner.cpp" />
-    <ClCompile Include="WiiWad.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Blob.h" />
@@ -70,16 +80,19 @@
     <ClInclude Include="FileBlob.h" />
     <ClInclude Include="Filesystem.h" />
     <ClInclude Include="FileSystemGCWii.h" />
+    <ClInclude Include="MultithreadedCompressor.h" />
     <ClInclude Include="NANDImporter.h" />
+    <ClInclude Include="ScrubbedBlob.h" />
     <ClInclude Include="TGCBlob.h" />
     <ClInclude Include="Volume.h" />
     <ClInclude Include="VolumeFileBlobReader.h" />
     <ClInclude Include="VolumeGC.h" />
+    <ClInclude Include="VolumeVerifier.h" />
     <ClInclude Include="VolumeWad.h" />
     <ClInclude Include="VolumeWii.h" />
     <ClInclude Include="WbfsBlob.h" />
+    <ClInclude Include="WiiEncryptionCache.h" />
     <ClInclude Include="WiiSaveBanner.h" />
-    <ClInclude Include="WiiWad.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />
@@ -93,6 +106,9 @@
     </ProjectReference>
     <ProjectReference Include="$(CoreDir)Common\Common.vcxproj">
       <Project>{2e6c348c-c75c-4d94-8d1e-9c1fcbf3efe4}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)pugixml\pugixml.vcxproj">
+      <Project>{38fee76f-f347-484b-949c-b4649381cffb}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

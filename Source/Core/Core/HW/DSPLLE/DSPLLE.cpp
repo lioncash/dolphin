@@ -30,9 +30,7 @@
 #include "Core/HW/Memmap.h"
 #include "Core/Host.h"
 
-namespace DSP
-{
-namespace LLE
+namespace DSP::LLE
 {
 static Common::Event s_dsp_event;
 static Common::Event s_ppc_event;
@@ -100,22 +98,24 @@ void DSPLLE::DSPThread(DSPLLE* dsp_lle)
     const int cycles = static_cast<int>(dsp_lle->m_cycle_count.load());
     if (cycles > 0)
     {
-      std::lock_guard<std::mutex> dsp_thread_lock(dsp_lle->m_dsp_thread_mutex);
-      if (g_dsp_jit)
+      std::unique_lock dsp_thread_lock(dsp_lle->m_dsp_thread_mutex, std::try_to_lock);
+      if (dsp_thread_lock)
       {
-        DSPCore_RunCycles(cycles);
+        if (g_dsp_jit)
+        {
+          DSPCore_RunCycles(cycles);
+        }
+        else
+        {
+          DSP::Interpreter::RunCyclesThread(cycles);
+        }
+        dsp_lle->m_cycle_count.store(0);
+        continue;
       }
-      else
-      {
-        DSP::Interpreter::RunCyclesThread(cycles);
-      }
-      dsp_lle->m_cycle_count.store(0);
     }
-    else
-    {
-      s_ppc_event.Set();
-      s_dsp_event.Wait();
-    }
+
+    s_ppc_event.Set();
+    s_dsp_event.Wait();
   }
 }
 
@@ -265,7 +265,8 @@ void DSPLLE::DSP_WriteMailBoxHigh(bool cpu_mailbox, u16 value)
   {
     if (gdsp_mbox_peek(MAILBOX_CPU) & 0x80000000)
     {
-      ERROR_LOG(DSPLLE, "Mailbox isn't empty ... strange");
+      // the DSP didn't read the previous value
+      WARN_LOG(DSPLLE, "Mailbox isn't empty ... strange");
     }
 
 #if PROFILE
@@ -336,9 +337,19 @@ u32 DSPLLE::DSP_UpdateRate()
 void DSPLLE::PauseAndLock(bool do_lock, bool unpause_on_unlock)
 {
   if (do_lock)
+  {
     m_dsp_thread_mutex.lock();
+  }
   else
+  {
     m_dsp_thread_mutex.unlock();
+
+    if (m_is_dsp_on_thread)
+    {
+      // Signal the DSP thread so it can perform any outstanding work now (if any)
+      s_ppc_event.Wait();
+      s_dsp_event.Set();
+    }
+  }
 }
-}  // namespace LLE
-}  // namespace DSP
+}  // namespace DSP::LLE

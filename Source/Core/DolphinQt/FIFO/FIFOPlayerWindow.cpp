@@ -147,36 +147,37 @@ void FIFOPlayerWindow::CreateWidgets()
   QWidget* main_widget = new QWidget(this);
   main_widget->setLayout(layout);
 
-  auto* tab_widget = new QTabWidget(this);
+  m_tab_widget = new QTabWidget(this);
 
   m_analyzer = new FIFOAnalyzer;
 
-  tab_widget->addTab(main_widget, tr("Play / Record"));
-  tab_widget->addTab(m_analyzer, tr("Analyze"));
+  m_tab_widget->addTab(main_widget, tr("Play / Record"));
+  m_tab_widget->addTab(m_analyzer, tr("Analyze"));
 
   auto* tab_layout = new QVBoxLayout;
-  tab_layout->addWidget(tab_widget);
+  tab_layout->addWidget(m_tab_widget);
 
   setLayout(tab_layout);
 }
 
 void FIFOPlayerWindow::ConnectWidgets()
 {
-  connect(m_load, &QPushButton::pressed, this, &FIFOPlayerWindow::LoadRecording);
-  connect(m_save, &QPushButton::pressed, this, &FIFOPlayerWindow::SaveRecording);
-  connect(m_record, &QPushButton::pressed, this, &FIFOPlayerWindow::StartRecording);
-  connect(m_stop, &QPushButton::pressed, this, &FIFOPlayerWindow::StopRecording);
+  connect(m_tab_widget, &QTabWidget::currentChanged, this, &FIFOPlayerWindow::OnLimitsChanged);
+  connect(m_load, &QPushButton::clicked, this, &FIFOPlayerWindow::LoadRecording);
+  connect(m_save, &QPushButton::clicked, this, &FIFOPlayerWindow::SaveRecording);
+  connect(m_record, &QPushButton::clicked, this, &FIFOPlayerWindow::StartRecording);
+  connect(m_stop, &QPushButton::clicked, this, &FIFOPlayerWindow::StopRecording);
   connect(m_button_box, &QDialogButtonBox::rejected, this, &FIFOPlayerWindow::reject);
   connect(m_early_memory_updates, &QCheckBox::toggled, this,
           &FIFOPlayerWindow::OnEarlyMemoryUpdatesChanged);
-  connect(m_frame_range_from, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this,
+  connect(m_frame_range_from, qOverload<int>(&QSpinBox::valueChanged), this,
           &FIFOPlayerWindow::OnLimitsChanged);
-  connect(m_frame_range_to, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this,
+  connect(m_frame_range_to, qOverload<int>(&QSpinBox::valueChanged), this,
           &FIFOPlayerWindow::OnLimitsChanged);
 
-  connect(m_object_range_from, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this,
+  connect(m_object_range_from, qOverload<int>(&QSpinBox::valueChanged), this,
           &FIFOPlayerWindow::OnLimitsChanged);
-  connect(m_object_range_to, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this,
+  connect(m_object_range_to, qOverload<int>(&QSpinBox::valueChanged), this,
           &FIFOPlayerWindow::OnLimitsChanged);
 }
 
@@ -244,6 +245,7 @@ void FIFOPlayerWindow::OnEmulationStopped()
     StopRecording();
 
   UpdateControls();
+  m_analyzer->Update();
 }
 
 void FIFOPlayerWindow::OnRecordingDone()
@@ -297,14 +299,14 @@ void FIFOPlayerWindow::OnFIFOLoaded()
 {
   FifoDataFile* file = FifoPlayer::GetInstance().GetFile();
 
-  auto object_count = FifoPlayer::GetInstance().GetFrameObjectCount();
+  auto object_count = FifoPlayer::GetInstance().GetMaxObjectCount();
   auto frame_count = file->GetFrameCount();
 
-  m_frame_range_to->setMaximum(frame_count);
-  m_object_range_to->setMaximum(object_count);
+  m_frame_range_to->setMaximum(frame_count - 1);
+  m_object_range_to->setMaximum(object_count - 1);
 
-  m_frame_range_to->setValue(frame_count);
-  m_object_range_to->setValue(object_count);
+  m_frame_range_to->setValue(frame_count - 1);
+  m_object_range_to->setValue(object_count - 1);
 
   UpdateInfo();
   UpdateLimits();
@@ -331,10 +333,10 @@ void FIFOPlayerWindow::OnLimitsChanged()
 
 void FIFOPlayerWindow::UpdateLimits()
 {
-  m_frame_range_from->setMaximum(std::max(m_frame_range_to->value() - 1, 0));
-  m_frame_range_to->setMinimum(m_frame_range_from->value() + 1);
-  m_object_range_from->setMaximum(std::max(m_object_range_to->value() - 1, 0));
-  m_object_range_to->setMinimum(m_object_range_from->value() + 1);
+  m_frame_range_from->setMaximum(std::max(m_frame_range_to->value(), 0));
+  m_frame_range_to->setMinimum(m_frame_range_from->value());
+  m_object_range_from->setMaximum(std::max(m_object_range_to->value(), 0));
+  m_object_range_to->setMinimum(m_object_range_from->value());
 }
 
 void FIFOPlayerWindow::UpdateControls()

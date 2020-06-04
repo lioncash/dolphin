@@ -9,7 +9,7 @@
 
 #include "Common/BitField.h"
 #include "Common/CommonTypes.h"
-#include "Common/Compiler.h"
+#include "Common/Inline.h"
 
 enum class EFBCopyFormat;
 
@@ -1105,4 +1105,6 @@ extern BPMemory bpmem;
 void LoadBPReg(u32 value0);
 void LoadBPRegPreprocess(u32 value0);
 
-void GetBPRegInfo(const u8* data, std::string* name, std::string* desc);
+int GetBPRegInfo(const u8* data, std::string* name, std::string* desc);
+void SimulateBPReg(const u8* data, BPMemory* bp, bool* scissor_set, bool* scissor_offset_set,
+                   bool* efb_copied);

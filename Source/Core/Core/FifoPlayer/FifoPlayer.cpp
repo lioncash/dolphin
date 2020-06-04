@@ -26,6 +26,7 @@
 #include "Core/PowerPC/PowerPC.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/CommandProcessor.h"
+#include "VideoCommon/OpcodeDecoding.h"
 
 // We need to include TextureDecoder.h for the texMem array.
 // TODO: Move texMem somewhere else so this isn't an issue.
@@ -49,10 +50,9 @@ bool FifoPlayer::Open(const std::string& filename)
 
   if (m_File)
   {
-    FifoAnalyzer::Init();
     FifoPlaybackAnalyzer::AnalyzeFrames(m_File.get(), m_FrameInfo);
 
-    m_FrameRangeEnd = m_File->GetFrameCount();
+    m_FrameRangeEnd = m_File->GetFrameCount() - 1;
   }
 
   if (m_FileLoadedCb)
@@ -66,7 +66,7 @@ void FifoPlayer::Close()
   m_File.reset();
 
   m_FrameRangeStart = 0;
-  m_FrameRangeEnd = 0;
+  m_FrameRangeEnd = -1;
 }
 
 bool FifoPlayer::IsPlaying() const
@@ -132,12 +132,12 @@ private:
 
 CPU::State FifoPlayer::AdvanceFrame()
 {
-  if (m_CurrentFrame >= m_FrameRangeEnd)
+  if (m_CurrentFrame > m_FrameRangeEnd)
   {
     if (!m_Loop)
       return CPU::State::PowerDown;
     // If there are zero frames in the range then sleep instead of busy spinning
-    if (m_FrameRangeStart >= m_FrameRangeEnd)
+    if (m_FrameRangeStart > m_FrameRangeEnd)
       return CPU::State::Stepping;
 
     // When looping, reload the contents of all the BP/CP/CF registers.
@@ -169,6 +169,17 @@ std::unique_ptr<CPUCoreBase> FifoPlayer::GetCPUCore()
   return std::make_unique<CPUCore>(this);
 }
 
+void FifoPlayer::SetFileLoadedCallback(CallbackFunc callback)
+{
+  m_FileLoadedCb = std::move(callback);
+
+  // Trigger the callback immediatly if the file is already loaded.
+  if (GetFile() != nullptr)
+  {
+    m_FileLoadedCb();
+  }
+}
+
 bool FifoPlayer::IsRunningWithFakeVideoInterfaceUpdates() const
 {
   if (!m_File || m_File->GetFrameCount() == 0)
@@ -189,13 +200,25 @@ u32 FifoPlayer::GetFrameObjectCount() const
   return 0;
 }
 
-void FifoPlayer::SetFrameRangeStart(u32 start)
+u32 FifoPlayer::GetMaxObjectCount() const
+{
+  u32 max = 0;
+  for (int frame_nr = 0; frame_nr < m_FrameInfo.size(); frame_nr++)
+  {
+    u32 count = (u32)(m_FrameInfo[frame_nr].objectStarts.size());
+    if (count > max)
+      max = count;
+  }
+  return max;
+}
+
+void FifoPlayer::SetFrameRangeStart(s32 start)
 {
   if (m_File)
   {
-    u32 frameCount = m_File->GetFrameCount();
-    if (start > frameCount)
-      start = frameCount;
+    s32 frameCount = m_File->GetFrameCount();
+    if (start > frameCount - 1)
+      start = frameCount - 1;
 
     m_FrameRangeStart = start;
     if (m_FrameRangeEnd < start)
@@ -206,19 +229,19 @@ void FifoPlayer::SetFrameRangeStart(u32 start)
   }
 }
 
-void FifoPlayer::SetFrameRangeEnd(u32 end)
+void FifoPlayer::SetFrameRangeEnd(s32 end)
 {
   if (m_File)
   {
-    u32 frameCount = m_File->GetFrameCount();
-    if (end > frameCount)
-      end = frameCount;
+    s32 frameCount = m_File->GetFrameCount();
+    if (end > frameCount - 1)
+      end = frameCount - 1;
 
     m_FrameRangeEnd = end;
     if (m_FrameRangeStart > end)
       m_FrameRangeStart = end;
 
-    if (m_CurrentFrame >= m_FrameRangeEnd)
+    if (m_CurrentFrame > m_FrameRangeEnd)
       m_CurrentFrame = m_FrameRangeStart;
   }
 }
@@ -237,9 +260,9 @@ void FifoPlayer::WriteFrame(const FifoFrameInfo& frame, const AnalyzedFrameInfo&
   m_FrameFifoSize = static_cast<u32>(frame.fifoData.size());
 
   // Determine start and end objects
-  u32 numObjects = (u32)(info.objectStarts.size());
-  u32 drawStart = std::min(numObjects, m_ObjectRangeStart);
-  u32 drawEnd = std::min(numObjects - 1, m_ObjectRangeEnd);
+  s32 numObjects = (s32)(info.objectStarts.size());
+  s32 drawStart = std::min(numObjects, m_ObjectRangeStart);
+  s32 drawEnd = std::min(numObjects - 1, m_ObjectRangeEnd);
 
   u32 position = 0;
   u32 memoryUpdate = 0;
@@ -250,9 +273,23 @@ void FifoPlayer::WriteFrame(const FifoFrameInfo& frame, const AnalyzedFrameInfo&
     memoryUpdate = (u32)(frame.memoryUpdates.size());
   }
 
+  // Don't clear the EFB after our last draw (or before our first draw)
+  for (ClearInfo clear : info.clears)
+  {
+    if (clear.address > info.objectStarts[drawEnd] ||
+        clear.address < info.objectStarts[drawStart] || m_ObjectRangeEnd < m_ObjectRangeStart)
+    {
+      UPE_Copy copy;
+      copy.Hex = clear.value;
+      copy.clear = false;
+      clear.value = copy.Hex;
+    }
+    *(u32*)(&frame.fifoData[(size_t)clear.address + 1]) = Common::swap32(clear.value);
+  }
+
   if (numObjects > 0)
   {
-    u32 objectNum = 0;
+    s32 objectNum = 0;
 
     // Write fifo data skipping objects before the draw range
     while (objectNum < drawStart)
@@ -280,6 +317,20 @@ void FifoPlayer::WriteFrame(const FifoFrameInfo& frame, const AnalyzedFrameInfo&
       position = info.objectEnds[objectNum];
       ++objectNum;
     }
+  }
+
+  if (drawStart > 0 || drawEnd < numObjects - 1 || drawStart > drawEnd)
+  {
+    // Set the clear color to magenta, aka fuchsia, if we aren't drawing everything.
+    // This is intended to be the same color used by an unwritten XFB.
+    u8 fuschia_commands[15] = {OpcodeDecoder::GX_LOAD_BP_REG, BPMEM_BP_MASK,  0, 0,   0xFF,
+                               OpcodeDecoder::GX_LOAD_BP_REG, BPMEM_CLEAR_AR, 0, 255, 183,
+                               OpcodeDecoder::GX_LOAD_BP_REG, BPMEM_CLEAR_GB, 0, 0,   236};
+    // This command takes 0 cycles (because it isn't real)
+    u64 temp = m_CyclesPerFrame;
+    m_CyclesPerFrame = 0;
+    WriteFifo(fuschia_commands, 0, 15);
+    m_CyclesPerFrame = temp;
   }
 
   // Write data after the last object
@@ -346,9 +397,9 @@ void FifoPlayer::WriteMemory(const MemoryUpdate& memUpdate)
   u8* mem = nullptr;
 
   if (memUpdate.address & 0x10000000)
-    mem = &Memory::m_pEXRAM[memUpdate.address & Memory::EXRAM_MASK];
+    mem = &Memory::m_pEXRAM[memUpdate.address & Memory::GetExRamMask()];
   else
-    mem = &Memory::m_pRAM[memUpdate.address & Memory::RAM_MASK];
+    mem = &Memory::m_pRAM[memUpdate.address & Memory::GetRamMask()];
 
   std::copy(memUpdate.data.begin(), memUpdate.data.end(), mem);
 }

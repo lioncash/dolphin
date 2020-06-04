@@ -2,14 +2,14 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include <algorithm>
+#include "VideoBackends/Vulkan/CommandBufferManager.h"
+
+#include <array>
 #include <cstdint>
 
 #include "Common/Assert.h"
-#include "Common/CommonFuncs.h"
 #include "Common/MsgHandler.h"
 
-#include "VideoBackends/Vulkan/CommandBufferManager.h"
 #include "VideoBackends/Vulkan/VulkanContext.h"
 
 namespace Vulkan
@@ -54,7 +54,6 @@ bool CommandBufferManager::CreateCommandBuffers()
   {
     resources.init_command_buffer_used = false;
     resources.semaphore_used = false;
-    resources.needs_fence_wait = false;
 
     VkCommandPoolCreateInfo pool_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, nullptr, 0,
                                          g_vulkan_context->GetGraphicsQueueFamilyIndex()};
@@ -95,18 +94,22 @@ bool CommandBufferManager::CreateCommandBuffers()
     }
 
     // TODO: A better way to choose the number of descriptors.
-    VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 500000},
-                                         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 500000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 16384},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 16384}};
+    const std::array<VkDescriptorPoolSize, 5> pool_sizes{{
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 500000},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 500000},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 16384},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 16384},
+    }};
 
-    VkDescriptorPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-                                                   nullptr,
-                                                   0,
-                                                   100000,  // tweak this
-                                                   static_cast<u32>(ArraySize(pool_sizes)),
-                                                   pool_sizes};
+    const VkDescriptorPoolCreateInfo pool_create_info = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        nullptr,
+        0,
+        100000,  // tweak this
+        static_cast<u32>(pool_sizes.size()),
+        pool_sizes.data(),
+    };
 
     res = vkCreateDescriptorPool(device, &pool_create_info, nullptr, &resources.descriptor_pool);
     if (res != VK_SUCCESS)
@@ -211,43 +214,61 @@ void CommandBufferManager::WaitForWorkerThreadIdle()
   m_submit_semaphore.Post();
 }
 
-void CommandBufferManager::WaitForGPUIdle()
+void CommandBufferManager::WaitForFenceCounter(u64 fence_counter)
 {
-  WaitForWorkerThreadIdle();
-  vkDeviceWaitIdle(g_vulkan_context->GetDevice());
-}
-
-void CommandBufferManager::WaitForFence(VkFence fence)
-{
-  // Find the command buffer that this fence corresponds to.
-  u32 command_buffer_index = 0;
-  for (; command_buffer_index < static_cast<u32>(m_frame_resources.size()); command_buffer_index++)
-  {
-    if (m_frame_resources[command_buffer_index].fence == fence)
-      break;
-  }
-  ASSERT(command_buffer_index < m_frame_resources.size());
-
-  // Has this command buffer already been waited for?
-  if (!m_frame_resources[command_buffer_index].needs_fence_wait)
+  if (m_completed_fence_counter >= fence_counter)
     return;
 
+  // Find the first command buffer which covers this counter value.
+  u32 index = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+  while (index != m_current_frame)
+  {
+    if (m_frame_resources[index].fence_counter >= fence_counter)
+      break;
+
+    index = (index + 1) % NUM_COMMAND_BUFFERS;
+  }
+
+  ASSERT(index != m_current_frame);
+  WaitForCommandBufferCompletion(index);
+}
+
+void CommandBufferManager::WaitForCommandBufferCompletion(u32 index)
+{
   // Ensure this command buffer has been submitted.
   WaitForWorkerThreadIdle();
 
   // Wait for this command buffer to be completed.
-  VkResult res =
-      vkWaitForFences(g_vulkan_context->GetDevice(), 1,
-                      &m_frame_resources[command_buffer_index].fence, VK_TRUE, UINT64_MAX);
+  VkResult res = vkWaitForFences(g_vulkan_context->GetDevice(), 1, &m_frame_resources[index].fence,
+                                 VK_TRUE, UINT64_MAX);
   if (res != VK_SUCCESS)
     LOG_VULKAN_ERROR(res, "vkWaitForFences failed: ");
 
-  // Immediately fire callbacks and cleanups, since the commands has been completed.
-  m_frame_resources[command_buffer_index].needs_fence_wait = false;
-  OnCommandBufferExecuted(command_buffer_index);
+  // Clean up any resources for command buffers between the last known completed buffer and this
+  // now-completed command buffer. If we use >2 buffers, this may be more than one buffer.
+  const u64 now_completed_counter = m_frame_resources[index].fence_counter;
+  u32 cleanup_index = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+  while (cleanup_index != m_current_frame)
+  {
+    FrameResources& resources = m_frame_resources[cleanup_index];
+    if (resources.fence_counter > now_completed_counter)
+      break;
+
+    if (resources.fence_counter > m_completed_fence_counter)
+    {
+      for (auto& it : resources.cleanup_resources)
+        it();
+      resources.cleanup_resources.clear();
+    }
+
+    cleanup_index = (cleanup_index + 1) % NUM_COMMAND_BUFFERS;
+  }
+
+  m_completed_fence_counter = now_completed_counter;
 }
 
 void CommandBufferManager::SubmitCommandBuffer(bool submit_on_worker_thread,
+                                               bool wait_for_completion,
                                                VkSwapchainKHR present_swap_chain,
                                                uint32_t present_image_index)
 {
@@ -263,16 +284,13 @@ void CommandBufferManager::SubmitCommandBuffer(bool submit_on_worker_thread,
     }
   }
 
-  // This command buffer now has commands, so can't be re-used without waiting.
-  resources.needs_fence_wait = true;
-
   // Grab the semaphore before submitting command buffer either on-thread or off-thread.
   // This prevents a race from occurring where a second command buffer is executed
   // before the worker thread has woken and executed the first one yet.
   m_submit_semaphore.Wait();
 
   // Submitting off-thread?
-  if (m_use_threaded_submission && submit_on_worker_thread)
+  if (m_use_threaded_submission && submit_on_worker_thread && !wait_for_completion)
   {
     // Push to the pending submit queue.
     {
@@ -287,6 +305,8 @@ void CommandBufferManager::SubmitCommandBuffer(bool submit_on_worker_thread,
   {
     // Pass through to normal submission path.
     SubmitCommandBuffer(m_current_frame, present_swap_chain, present_image_index);
+    if (wait_for_completion)
+      WaitForCommandBufferCompletion(m_current_frame);
   }
 
   // Switch to next cmdbuffer.
@@ -318,7 +338,7 @@ void CommandBufferManager::SubmitCommandBuffer(u32 command_buffer_index,
     submit_info.pCommandBuffers = &resources.command_buffers[1];
   }
 
-  if (resources.semaphore_used != VK_NULL_HANDLE)
+  if (resources.semaphore_used)
   {
     submit_info.pWaitSemaphores = &resources.semaphore;
     submit_info.waitSemaphoreCount = 1;
@@ -351,13 +371,25 @@ void CommandBufferManager::SubmitCommandBuffer(u32 command_buffer_index,
                                      &present_image_index,
                                      nullptr};
 
-    res = vkQueuePresentKHR(g_vulkan_context->GetPresentQueue(), &present_info);
-    if (res != VK_SUCCESS)
+    m_last_present_result = vkQueuePresentKHR(g_vulkan_context->GetPresentQueue(), &present_info);
+    if (m_last_present_result != VK_SUCCESS)
     {
       // VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
-      if (res != VK_ERROR_OUT_OF_DATE_KHR && res != VK_SUBOPTIMAL_KHR)
-        LOG_VULKAN_ERROR(res, "vkQueuePresentKHR failed: ");
-      m_present_failed_flag.Set();
+      if (m_last_present_result != VK_ERROR_OUT_OF_DATE_KHR &&
+          m_last_present_result != VK_SUBOPTIMAL_KHR &&
+          m_last_present_result != VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+      {
+        LOG_VULKAN_ERROR(m_last_present_result, "vkQueuePresentKHR failed: ");
+      }
+
+      // Don't treat VK_SUBOPTIMAL_KHR as fatal on Android. Android 10+ requires prerotation.
+      // See https://twitter.com/Themaister/status/1207062674011574273
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+      if (m_last_present_result != VK_SUBOPTIMAL_KHR)
+        m_last_present_failed.Set();
+#else
+      m_last_present_failed.Set();
+#endif
     }
   }
 
@@ -365,39 +397,15 @@ void CommandBufferManager::SubmitCommandBuffer(u32 command_buffer_index,
   m_submit_semaphore.Post();
 }
 
-void CommandBufferManager::OnCommandBufferExecuted(u32 index)
-{
-  FrameResources& resources = m_frame_resources[index];
-
-  // Fire fence tracking callbacks.
-  for (auto iter = m_fence_callbacks.begin(); iter != m_fence_callbacks.end();)
-  {
-    auto backup_iter = iter++;
-    backup_iter->second(resources.fence);
-  }
-
-  // Clean up all objects pending destruction on this command buffer
-  for (auto& it : resources.cleanup_resources)
-    it();
-  resources.cleanup_resources.clear();
-}
-
 void CommandBufferManager::BeginCommandBuffer()
 {
   // Move to the next command buffer.
-  m_current_frame = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
-  FrameResources& resources = m_frame_resources[m_current_frame];
+  const u32 next_buffer_index = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+  FrameResources& resources = m_frame_resources[next_buffer_index];
 
   // Wait for the GPU to finish with all resources for this command buffer.
-  if (resources.needs_fence_wait)
-  {
-    VkResult res =
-        vkWaitForFences(g_vulkan_context->GetDevice(), 1, &resources.fence, true, UINT64_MAX);
-    if (res != VK_SUCCESS)
-      LOG_VULKAN_ERROR(res, "vkWaitForFences failed: ");
-
-    OnCommandBufferExecuted(m_current_frame);
-  }
+  if (resources.fence_counter > m_completed_fence_counter)
+    WaitForCommandBufferCompletion(next_buffer_index);
 
   // Reset fence to unsignaled before starting.
   VkResult res = vkResetFences(g_vulkan_context->GetDevice(), 1, &resources.fence);
@@ -427,6 +435,8 @@ void CommandBufferManager::BeginCommandBuffer()
   // Reset upload command buffer state
   resources.init_command_buffer_used = false;
   resources.semaphore_used = false;
+  resources.fence_counter = m_next_fence_counter++;
+  m_current_frame = next_buffer_index;
 }
 
 void CommandBufferManager::DeferBufferDestruction(VkBuffer object)
@@ -469,20 +479,6 @@ void CommandBufferManager::DeferImageViewDestruction(VkImageView object)
   FrameResources& resources = m_frame_resources[m_current_frame];
   resources.cleanup_resources.push_back(
       [object]() { vkDestroyImageView(g_vulkan_context->GetDevice(), object, nullptr); });
-}
-
-void CommandBufferManager::AddFenceSignaledCallback(const void* key, FenceSignaledCallback callback)
-{
-  // Shouldn't be adding twice.
-  ASSERT(m_fence_callbacks.find(key) == m_fence_callbacks.end());
-  m_fence_callbacks.emplace(key, std::move(callback));
-}
-
-void CommandBufferManager::RemoveFenceSignaledCallback(const void* key)
-{
-  auto iter = m_fence_callbacks.find(key);
-  ASSERT(iter != m_fence_callbacks.end());
-  m_fence_callbacks.erase(iter);
 }
 
 std::unique_ptr<CommandBufferManager> g_command_buffer_mgr;

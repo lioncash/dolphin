@@ -7,6 +7,7 @@
 #include "UpdaterCommon/UI.h"
 
 #include <Cocoa/Cocoa.h>
+#include <unistd.h>
 
 #include <functional>
 
@@ -43,8 +44,8 @@ void UI::Error(const std::string& text)
     NSAlert* alert = [[[NSAlert alloc] init] autorelease];
 
     [alert setMessageText:@"Fatal error"];
-    [alert
-        setInformativeText:[NSString stringWithCString:text.c_str() encoding:NSUTF8StringEncoding]];
+    [alert setInformativeText:[NSString stringWithCString:text.c_str()
+                                                 encoding:NSUTF8StringEncoding]];
     [alert setAlertStyle:NSAlertStyleCritical];
 
     [alert beginSheetModalForWindow:GetWindow()
@@ -72,8 +73,8 @@ void UI::SetVisible(bool visible)
 void UI::SetDescription(const std::string& text)
 {
   run_on_main([&] {
-    [GetView()
-        SetDescription:[NSString stringWithCString:text.c_str() encoding:NSUTF8StringEncoding]];
+    [GetView() SetDescription:[NSString stringWithCString:text.c_str()
+                                                 encoding:NSUTF8StringEncoding]];
   });
 }
 
@@ -107,6 +108,32 @@ void UI::SetTotalProgress(int current, int total)
   run_on_main([&] { [GetView() SetTotalProgress:(double)current total:(double)total]; });
 }
 
+void UI::Sleep(int seconds)
+{
+  [NSThread sleepForTimeInterval:static_cast<float>(seconds)];
+}
+
+void UI::WaitForPID(u32 pid)
+{
+  for (int res = kill(pid, 0); res == 0 || (res < 0 && errno == EPERM); res = kill(pid, 0))
+  {
+    UI::Sleep(1);
+  }
+}
+
+void UI::LaunchApplication(std::string path)
+{
+  [[NSWorkspace sharedWorkspace]
+      launchApplication:[NSString stringWithCString:path.c_str()
+                                           encoding:[NSString defaultCStringEncoding]]];
+}
+
 void UI::Stop()
+{
+  run_on_main([] { [NSApp performSelector:@selector(terminate:) withObject:nil afterDelay:0.0]; });
+}
+
+// Stub. Only needed on Windows
+void UI::Init()
 {
 }

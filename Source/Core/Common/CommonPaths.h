@@ -41,6 +41,7 @@
 #define MAPS_DIR "Maps"
 #define CACHE_DIR "Cache"
 #define COVERCACHE_DIR "GameCovers"
+#define REDUMPCACHE_DIR "Redump"
 #define SHADERCACHE_DIR "Shaders"
 #define STATESAVES_DIR "StateSaves"
 #define SCREENSHOTS_DIR "ScreenShots"
@@ -62,6 +63,7 @@
 #define THEMES_DIR "Themes"
 #define STYLES_DIR "Styles"
 #define ANAGLYPH_DIR "Anaglyph"
+#define PASSIVE_DIR "Passive"
 #define PIPES_DIR "Pipes"
 #define MEMORYWATCHER_DIR "MemoryWatcher"
 #define WFSROOT_DIR "WFS"
@@ -83,6 +85,7 @@
 #define GFX_CONFIG "GFX.ini"
 #define DEBUGGER_CONFIG "Debugger.ini"
 #define LOGGER_CONFIG "Logger.ini"
+#define DUALSHOCKUDPCLIENT_CONFIG "DSUClient.ini"
 
 // Files in the directory returned by GetUserPath(D_LOGS_IDX)
 #define MAIN_LOG "dolphin.log"
@@ -91,7 +94,8 @@
 #define WII_SYSCONF "SYSCONF"
 
 // Files in the directory returned by GetUserPath(D_DUMP_IDX)
-#define RAM_DUMP "ram.raw"
+#define MEM1_DUMP "mem1.raw"
+#define MEM2_DUMP "mem2.raw"
 #define ARAM_DUMP "aram.raw"
 #define FAKEVMEM_DUMP "fakevmem.raw"
 

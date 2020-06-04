@@ -17,6 +17,7 @@ add_library(videod3d
   PerfQuery.h
   Render.cpp
   Render.h
+  SwapChain.cpp
   VertexManager.cpp
   VertexManager.h
   VideoBackend.h
@@ -26,4 +27,5 @@ target_link_libraries(videod3d
 PUBLIC
   common
   videocommon
+  videod3dcommon
 )

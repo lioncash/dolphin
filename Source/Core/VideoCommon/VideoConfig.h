@@ -14,7 +14,8 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
-#include "VideoCommon/VideoCommon.h"
+
+enum class APIType;
 
 // Log in two categories, and save three other options in the same byte
 #define CONF_LOG 1
@@ -39,7 +40,7 @@ enum class StereoMode : int
   TAB,
   Anaglyph,
   QuadBuffer,
-  Nvidia3DVision
+  Passive
 };
 
 enum class ShaderCompilationMode : int
@@ -48,6 +49,13 @@ enum class ShaderCompilationMode : int
   SynchronousUberShaders,
   AsynchronousUberShaders,
   AsynchronousSkipRendering
+};
+
+enum class FreelookControlType : int
+{
+  SixAxis,
+  FPS,
+  Orbital
 };
 
 // NEVER inherit from this class.
@@ -106,12 +114,14 @@ struct VideoConfig final
   std::string sDumpPath;
   bool bInternalResolutionFrameDumps;
   bool bFreeLook;
+  FreelookControlType iFreelookControlType;
   bool bBorderlessFullscreen;
   bool bEnableGPUTextureDecoding;
   int iBitrateKbps;
 
   // Hacks
   bool bEFBAccessEnable;
+  bool bEFBAccessDeferInvalidation;
   bool bPerfQueriesEnable;
   bool bBBoxEnable;
   bool bForceProgressive;
@@ -122,12 +132,14 @@ struct VideoConfig final
   bool bDisableCopyToVRAM;
   bool bDeferEFBCopies;
   bool bImmediateXFB;
+  bool bSkipPresentingDuplicateXFBs;
   bool bCopyEFBScaled;
   int iSafeTextureCache_ColorSamples;
   float fAspectRatioHackW, fAspectRatioHackH;
   bool bEnablePixelLighting;
   bool bFastDepthCalc;
   bool bVertexRounding;
+  int iEFBAccessTileSize;
   int iLog;           // CONF_ bits
   int iSaveTargetId;  // TODO: Should be dropped
 
@@ -216,6 +228,10 @@ struct VideoConfig final
     bool bSupportsFramebufferFetch;  // Used as an alternative to dual-source blend on GLES
     bool bSupportsBackgroundCompiling;
     bool bSupportsLargePoints;
+    bool bSupportsPartialDepthCopies;
+    bool bSupportsDepthReadback;
+    bool bSupportsShaderBinaries;
+    bool bSupportsPipelineCacheData;
   } backend_info;
 
   // Utility

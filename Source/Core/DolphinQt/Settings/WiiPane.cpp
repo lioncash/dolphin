@@ -22,7 +22,6 @@
 #include "Core/Config/SYSCONFSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
-#include "Core/IOS/IOS.h"
 
 #include "DolphinQt/Settings.h"
 #include "DolphinQt/Settings/USBDeviceAddToWhitelistDialog.h"
@@ -49,6 +48,7 @@ WiiPane::WiiPane(QWidget* parent) : QWidget(parent)
   LoadConfig();
   ConnectLayout();
   ValidateSelectionState();
+  OnEmulationStateChanged(Core::GetState() != Core::State::Uninitialized);
 }
 
 void WiiPane::CreateLayout()
@@ -64,33 +64,36 @@ void WiiPane::CreateLayout()
 void WiiPane::ConnectLayout()
 {
   // Misc Settings
-  connect(m_aspect_ratio_choice,
-          static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
+  connect(m_aspect_ratio_choice, qOverload<int>(&QComboBox::currentIndexChanged), this,
           &WiiPane::OnSaveConfig);
-  connect(m_system_language_choice,
-          static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
+  connect(m_system_language_choice, qOverload<int>(&QComboBox::currentIndexChanged), this,
           &WiiPane::OnSaveConfig);
   connect(m_screensaver_checkbox, &QCheckBox::toggled, this, &WiiPane::OnSaveConfig);
   connect(m_pal60_mode_checkbox, &QCheckBox::toggled, this, &WiiPane::OnSaveConfig);
   connect(m_sd_card_checkbox, &QCheckBox::toggled, this, &WiiPane::OnSaveConfig);
   connect(m_connect_keyboard_checkbox, &QCheckBox::toggled, this, &WiiPane::OnSaveConfig);
+  connect(&Settings::Instance(), &Settings::SDCardInsertionChanged, m_sd_card_checkbox,
+          &QCheckBox::setChecked);
   connect(&Settings::Instance(), &Settings::USBKeyboardConnectionChanged,
           m_connect_keyboard_checkbox, &QCheckBox::setChecked);
 
   // Whitelisted USB Passthrough Devices
   connect(m_whitelist_usb_list, &QListWidget::itemClicked, this, &WiiPane::ValidateSelectionState);
-  connect(m_whitelist_usb_add_button, &QPushButton::pressed, this,
+  connect(m_whitelist_usb_add_button, &QPushButton::clicked, this,
           &WiiPane::OnUSBWhitelistAddButton);
-  connect(m_whitelist_usb_remove_button, &QPushButton::pressed, this,
+  connect(m_whitelist_usb_remove_button, &QPushButton::clicked, this,
           &WiiPane::OnUSBWhitelistRemoveButton);
 
   // Wii Remote Settings
-  connect(m_wiimote_ir_sensor_position,
-          static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
+  connect(m_wiimote_ir_sensor_position, qOverload<int>(&QComboBox::currentIndexChanged), this,
           &WiiPane::OnSaveConfig);
   connect(m_wiimote_ir_sensitivity, &QSlider::valueChanged, this, &WiiPane::OnSaveConfig);
   connect(m_wiimote_speaker_volume, &QSlider::valueChanged, this, &WiiPane::OnSaveConfig);
   connect(m_wiimote_motor, &QCheckBox::toggled, this, &WiiPane::OnSaveConfig);
+
+  // Emulation State
+  connect(&Settings::Instance(), &Settings::EmulationStateChanged,
+          [=](Core::State state) { OnEmulationStateChanged(state != Core::State::Uninitialized); });
 }
 
 void WiiPane::CreateMisc()
@@ -124,7 +127,7 @@ void WiiPane::CreateMisc()
                                        "(576i) for PAL games.\nMay not work for all games."));
   m_screensaver_checkbox->setToolTip(tr("Dims the screen after five minutes of inactivity."));
   m_system_language_choice->setToolTip(tr("Sets the Wii system language."));
-  m_sd_card_checkbox->setToolTip(tr("Saved to /Wii/sd.raw (default size is 128mb)."));
+  m_sd_card_checkbox->setToolTip(tr("Supports SD and SDHC. Default size is 128 MB."));
   m_connect_keyboard_checkbox->setToolTip(tr("May cause slow down in Wii Menu and some games."));
 
   misc_settings_group_layout->addWidget(m_pal60_mode_checkbox, 0, 0, 1, 1);
@@ -171,8 +174,9 @@ void WiiPane::CreateWiiRemoteSettings()
   // i18n: IR stands for infrared and refers to the pointer functionality of Wii Remotes
   m_wiimote_ir_sensitivity_label = new QLabel(tr("IR Sensitivity:"));
   m_wiimote_ir_sensitivity = new QSlider(Qt::Horizontal);
-  m_wiimote_ir_sensitivity->setMinimum(4);
-  m_wiimote_ir_sensitivity->setMaximum(127);
+  // Wii menu saves values from 1 to 5.
+  m_wiimote_ir_sensitivity->setMinimum(1);
+  m_wiimote_ir_sensitivity->setMaximum(5);
 
   // Speaker Volume Slider
   m_wiimote_speaker_volume_label = new QLabel(tr("Speaker Volume:"));
@@ -205,8 +209,8 @@ void WiiPane::LoadConfig()
 {
   m_screensaver_checkbox->setChecked(Config::Get(Config::SYSCONF_SCREENSAVER));
   m_pal60_mode_checkbox->setChecked(Config::Get(Config::SYSCONF_PAL60));
+  m_sd_card_checkbox->setChecked(Settings::Instance().IsSDCardInserted());
   m_connect_keyboard_checkbox->setChecked(Settings::Instance().IsUSBKeyboardConnected());
-  m_sd_card_checkbox->setChecked(SConfig::GetInstance().m_WiiSDCard);
   m_aspect_ratio_choice->setCurrentIndex(Config::Get(Config::SYSCONF_WIDESCREEN));
   m_system_language_choice->setCurrentIndex(Config::Get(Config::SYSCONF_LANGUAGE));
 
@@ -225,15 +229,8 @@ void WiiPane::OnSaveConfig()
 
   Config::SetBase(Config::SYSCONF_SCREENSAVER, m_screensaver_checkbox->isChecked());
   Config::SetBase(Config::SYSCONF_PAL60, m_pal60_mode_checkbox->isChecked());
+  Settings::Instance().SetSDCardInserted(m_sd_card_checkbox->isChecked());
   Settings::Instance().SetUSBKeyboardConnected(m_connect_keyboard_checkbox->isChecked());
-
-  if (SConfig::GetInstance().m_WiiSDCard != m_sd_card_checkbox->isChecked())
-  {
-    SConfig::GetInstance().m_WiiSDCard = m_sd_card_checkbox->isChecked();
-    auto* ios = IOS::HLE::GetIOS();
-    if (ios)
-      ios->SDIO_EventNotify();
-  }
 
   Config::SetBase<u32>(Config::SYSCONF_SENSOR_BAR_POSITION,
                        TranslateSensorBarPosition(m_wiimote_ir_sensor_position->currentIndex()));

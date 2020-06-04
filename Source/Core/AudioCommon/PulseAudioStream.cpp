@@ -15,13 +15,11 @@ namespace
 const size_t BUFFER_SAMPLES = 512;  // ~10 ms - needs to be at least 240 for surround
 }
 
-PulseAudio::PulseAudio() : m_thread(), m_run_thread()
-{
-}
+PulseAudio::PulseAudio() = default;
 
 bool PulseAudio::Init()
 {
-  m_stereo = !SConfig::GetInstance().bDPL2Decoder;
+  m_stereo = !SConfig::GetInstance().ShouldUseDPL2Decoder();
   m_channels = m_stereo ? 2 : 6;  // will tell PA we use a Stereo or 5.0 channel setup
 
   NOTICE_LOG(AUDIO, "PulseAudio backend using %d channels", m_channels);

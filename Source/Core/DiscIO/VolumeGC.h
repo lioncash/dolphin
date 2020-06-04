@@ -25,7 +25,7 @@ enum class Language;
 enum class Region;
 enum class Platform;
 
-class VolumeGC : public Volume
+class VolumeGC : public VolumeDisc
 {
 public:
   VolumeGC(std::unique_ptr<BlobReader> reader);
@@ -52,6 +52,7 @@ public:
   Country GetCountry(const Partition& partition = PARTITION_NONE) const override;
   BlobType GetBlobType() const override;
   u64 GetSize() const override;
+  bool IsSizeAccurate() const override;
   u64 GetRawSize() const override;
 
 private:
@@ -107,4 +108,4 @@ private:
   std::unique_ptr<BlobReader> m_reader;
 };
 
-}  // namespace
+}  // namespace DiscIO

@@ -6,8 +6,9 @@
 
 package org.dolphinemu.dolphinemu;
 
-import android.app.AlertDialog;
 import android.view.Surface;
+
+import androidx.appcompat.app.AlertDialog;
 
 import org.dolphinemu.dolphinemu.activities.EmulationActivity;
 import org.dolphinemu.dolphinemu.utils.Log;
@@ -195,6 +196,18 @@ public final class NativeLibrary
     public static final int TURNTABLE_CROSSFADE = 622;
     public static final int TURNTABLE_CROSSFADE_LEFT = 623;
     public static final int TURNTABLE_CROSSFADE_RIGHT = 624;
+    public static final int WIIMOTE_ACCEL_LEFT = 625;
+    public static final int WIIMOTE_ACCEL_RIGHT = 626;
+    public static final int WIIMOTE_ACCEL_FORWARD = 627;
+    public static final int WIIMOTE_ACCEL_BACKWARD = 628;
+    public static final int WIIMOTE_ACCEL_UP = 629;
+    public static final int WIIMOTE_ACCEL_DOWN = 630;
+    public static final int WIIMOTE_GYRO_PITCH_UP = 631;
+    public static final int WIIMOTE_GYRO_PITCH_DOWN = 632;
+    public static final int WIIMOTE_GYRO_ROLL_LEFT = 633;
+    public static final int WIIMOTE_GYRO_ROLL_RIGHT = 634;
+    public static final int WIIMOTE_GYRO_YAW_LEFT = 635;
+    public static final int WIIMOTE_GYRO_YAW_RIGHT = 636;
   }
 
   /**
@@ -252,6 +265,11 @@ public final class NativeLibrary
 
     Rumble.checkRumble(padID, state);
   }
+
+  public static native void SetMotionSensorsEnabled(boolean accelerometerEnabled,
+          boolean gyroscopeEnabled);
+
+  public static native void NewGameIniFile();
 
   public static native void LoadGameIniFile(String gameId);
 
@@ -347,10 +365,29 @@ public final class NativeLibrary
 
   public static native int DefaultCPUCore();
 
+  public static native void ReloadConfig();
+
+  /**
+   * Initializes the native parts of the app.
+   *
+   * Should be called at app start before running any other native code
+   * (other than the native methods in DirectoryInitialization).
+   */
+  public static native void Initialize();
+
+  /**
+   * Tells analytics that Dolphin has been started.
+   *
+   * Since users typically don't explicitly close Android apps, it's appropriate to
+   * call this not only when the app starts but also when the user returns to the app
+   * after not using it for a significant amount of time.
+   */
+  public static native void ReportStartToAnalytics();
+
   /**
    * Begins emulation.
    */
-  public static native void Run(String[] path, boolean firstOpen);
+  public static native void Run(String[] path);
 
   /**
    * Begins emulation from the specified savestate.
@@ -378,6 +415,8 @@ public final class NativeLibrary
    * Stops emulation.
    */
   public static native void StopEmulation();
+
+  public static native void WaitUntilDoneBooting();
 
   /**
    * Returns true if emulation is running (or is paused).
@@ -408,6 +447,8 @@ public final class NativeLibrary
 
   public static native void ReloadWiimoteConfig();
 
+  public static native boolean InstallWAD(String file);
+
   private static boolean alertResult = false;
 
   public static boolean displayAlertMsg(final String caption, final String text,
@@ -424,7 +465,8 @@ public final class NativeLibrary
     {
       // Create object used for waiting.
       final Object lock = new Object();
-      AlertDialog.Builder builder = new AlertDialog.Builder(emulationActivity)
+      AlertDialog.Builder builder = new AlertDialog.Builder(emulationActivity,
+              R.style.DolphinDialogBase)
               .setTitle(caption)
               .setMessage(text);
 
@@ -469,7 +511,7 @@ public final class NativeLibrary
       }
 
       // Show the AlertDialog on the main thread.
-      emulationActivity.runOnUiThread(() -> builder.show());
+      emulationActivity.runOnUiThread(builder::show);
 
       // Wait for the lock to notify that it is complete.
       synchronized (lock)

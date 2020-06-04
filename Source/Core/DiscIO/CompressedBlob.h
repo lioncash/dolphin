@@ -49,8 +49,10 @@ public:
   ~CompressedBlobReader();
   const CompressedBlobHeader& GetHeader() const { return m_header; }
   BlobType GetBlobType() const override { return BlobType::GCZ; }
-  u64 GetDataSize() const override { return m_header.data_size; }
   u64 GetRawSize() const override { return m_file_size; }
+  u64 GetDataSize() const override { return m_header.data_size; }
+  bool IsDataSizeAccurate() const override { return true; }
+  u64 GetBlockSize() const override { return m_header.block_size; }
   u64 GetBlockCompressedSize(u64 block_num) const;
   bool GetBlock(u64 block_num, u8* out_ptr) override;
 
@@ -67,4 +69,4 @@ private:
   std::string m_file_name;
 };
 
-}  // namespace
+}  // namespace DiscIO

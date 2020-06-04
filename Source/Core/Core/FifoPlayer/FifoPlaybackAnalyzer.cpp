@@ -7,8 +7,11 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
+#include "Common/Swap.h"
 #include "Core/FifoPlayer/FifoAnalyzer.h"
 #include "Core/FifoPlayer/FifoDataFile.h"
+#include "VideoCommon/BPMemory.h"
+#include "VideoCommon/OpcodeDecoding.h"
 
 using namespace FifoAnalyzer;
 
@@ -42,6 +45,7 @@ void FifoPlaybackAnalyzer::AnalyzeFrames(FifoDataFile* file,
   {
     const FifoFrameInfo& frame = file->GetFrame(frameIdx);
     AnalyzedFrameInfo& analyzed = frameInfo[frameIdx];
+    ClearInfo clear;
 
     s_DrawingObject = false;
 
@@ -63,9 +67,33 @@ void FifoPlaybackAnalyzer::AnalyzeFrames(FifoDataFile* file,
         ++nextMemUpdate;
       }
 
-      bool wasDrawing = s_DrawingObject;
+      const bool wasDrawing = s_DrawingObject;
+      const u32 cmdSize =
+          FifoAnalyzer::AnalyzeCommand(&frame.fifoData[cmdStart], DecodeMode::Playback);
 
-      u32 cmdSize = FifoAnalyzer::AnalyzeCommand(&frame.fifoData[cmdStart], DECODE_PLAYBACK);
+      // check for clear commands
+      if ((!s_DrawingObject) && cmdSize == 5)
+      {
+        u8 cmd = frame.fifoData[cmdStart];
+        if (cmd == OpcodeDecoder::GX_LOAD_BP_REG)
+        {
+          u8 cmd2 = frame.fifoData[size_t(cmdStart) + 1];
+          // the last command in the FIFO is an XFB copy and it's usually a clear,
+          // but we won't add the XFB copy to the list
+          if (cmd2 == BPMEM_TRIGGER_EFB_COPY && cmdStart < frame.fifoData.size() - 5)
+          {
+            u32 value = Common::swap32(&frame.fifoData[size_t(cmdStart) + 1]);
+            UPE_Copy copy;
+            copy.Hex = value;
+            if (copy.clear)
+            {
+              clear.address = cmdStart;
+              clear.value = value;
+              analyzed.clears.push_back(clear);
+            }
+          }
+        }
+      }
 
 #if LOG_FIFO_CMDS
       CmdData cmdData;

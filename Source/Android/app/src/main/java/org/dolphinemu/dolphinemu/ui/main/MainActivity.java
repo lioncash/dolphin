@@ -3,12 +3,16 @@ package org.dolphinemu.dolphinemu.ui.main;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.TabLayout;
-import android.support.v4.view.ViewPager;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+
+import androidx.annotation.Nullable;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
+
+import androidx.viewpager.widget.ViewPager;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -16,6 +20,7 @@ import android.view.View;
 import android.widget.Toast;
 
 import org.dolphinemu.dolphinemu.R;
+import org.dolphinemu.dolphinemu.activities.EmulationActivity;
 import org.dolphinemu.dolphinemu.adapters.PlatformPagerAdapter;
 import org.dolphinemu.dolphinemu.features.settings.ui.MenuTag;
 import org.dolphinemu.dolphinemu.features.settings.ui.SettingsActivity;
@@ -107,10 +112,10 @@ public final class MainActivity extends AppCompatActivity implements MainView
   // TODO: Replace with a ButterKnife injection.
   private void findViews()
   {
-    mToolbar = (Toolbar) findViewById(R.id.toolbar_main);
-    mViewPager = (ViewPager) findViewById(R.id.pager_platforms);
-    mTabLayout = (TabLayout) findViewById(R.id.tabs_platforms);
-    mFab = (FloatingActionButton) findViewById(R.id.button_add_directory);
+    mToolbar = findViewById(R.id.toolbar_main);
+    mViewPager = findViewById(R.id.pager_platforms);
+    mTabLayout = findViewById(R.id.tabs_platforms);
+    mFab = findViewById(R.id.button_add_directory);
   }
 
   @Override
@@ -132,19 +137,6 @@ public final class MainActivity extends AppCompatActivity implements MainView
   }
 
   @Override
-  public void refreshFragmentScreenshot(int fragmentPosition)
-  {
-    // Invalidate Picasso image so that the new screenshot is animated in.
-    Platform platform = Platform.fromPosition(mViewPager.getCurrentItem());
-    PlatformGamesView fragment = getPlatformGamesView(platform);
-
-    if (fragment != null)
-    {
-      fragment.refreshScreenshotAtPosition(fragmentPosition);
-    }
-  }
-
-  @Override
   public void launchSettingsActivity(MenuTag menuTag)
   {
     SettingsActivity.launch(this, menuTag, "");
@@ -153,7 +145,21 @@ public final class MainActivity extends AppCompatActivity implements MainView
   @Override
   public void launchFileListActivity()
   {
-    FileBrowserHelper.openDirectoryPicker(this);
+    FileBrowserHelper.openDirectoryPicker(this, FileBrowserHelper.GAME_EXTENSIONS);
+  }
+
+  @Override
+  public void launchOpenFileActivity()
+  {
+    FileBrowserHelper.openFilePicker(this, MainPresenter.REQUEST_GAME_FILE, false,
+            FileBrowserHelper.GAME_EXTENSIONS);
+  }
+
+  @Override
+  public void launchInstallWAD()
+  {
+    FileBrowserHelper.openFilePicker(this, MainPresenter.REQUEST_WAD_FILE, false,
+            FileBrowserHelper.WAD_EXTENSION);
   }
 
   /**
@@ -164,18 +170,31 @@ public final class MainActivity extends AppCompatActivity implements MainView
   @Override
   protected void onActivityResult(int requestCode, int resultCode, Intent result)
   {
+    super.onActivityResult(requestCode, resultCode, result);
     switch (requestCode)
     {
-      case MainPresenter.REQUEST_ADD_DIRECTORY:
+      case MainPresenter.REQUEST_DIRECTORY:
         // If the user picked a file, as opposed to just backing out.
         if (resultCode == MainActivity.RESULT_OK)
         {
-          mPresenter.onDirectorySelected(FileBrowserHelper.getSelectedDirectory(result));
+          mPresenter.onDirectorySelected(FileBrowserHelper.getSelectedPath(result));
         }
         break;
 
-      case MainPresenter.REQUEST_EMULATE_GAME:
-        mPresenter.refreshFragmentScreenshot(resultCode);
+      case MainPresenter.REQUEST_GAME_FILE:
+        // If the user picked a file, as opposed to just backing out.
+        if (resultCode == MainActivity.RESULT_OK)
+        {
+          EmulationActivity.launchFile(this, FileBrowserHelper.getSelectedFiles(result));
+        }
+        break;
+
+      case MainPresenter.REQUEST_WAD_FILE:
+        // If the user picked a file, as opposed to just backing out.
+        if (resultCode == MainActivity.RESULT_OK)
+        {
+          mPresenter.installWAD(FileBrowserHelper.getSelectedPath(result));
+        }
         break;
     }
   }

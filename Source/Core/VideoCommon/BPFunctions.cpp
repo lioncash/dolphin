@@ -2,11 +2,14 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "VideoCommon/BPFunctions.h"
+
+#include <algorithm>
+
 #include "Common/CommonTypes.h"
 #include "Common/Logging/Log.h"
 
 #include "VideoCommon/AbstractFramebuffer.h"
-#include "VideoCommon/BPFunctions.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/FramebufferManager.h"
 #include "VideoCommon/RenderBase.h"
@@ -49,8 +52,8 @@ void SetScissor()
   const int xoff = bpmem.scissorOffset.x * 2;
   const int yoff = bpmem.scissorOffset.y * 2;
 
-  EFBRectangle native_rc(bpmem.scissorTL.x - xoff, bpmem.scissorTL.y - yoff,
-                         bpmem.scissorBR.x - xoff + 1, bpmem.scissorBR.y - yoff + 1);
+  MathUtil::Rectangle<int> native_rc(bpmem.scissorTL.x - xoff, bpmem.scissorTL.y - yoff,
+                                     bpmem.scissorBR.x - xoff + 1, bpmem.scissorBR.y - yoff + 1);
   native_rc.ClampUL(0, 0, EFB_WIDTH, EFB_HEIGHT);
 
   auto target_rc = g_renderer->ConvertEFBRectangle(native_rc);
@@ -90,8 +93,8 @@ void SetViewport()
   {
     // There's no way to support oversized depth ranges in this situation. Let's just clamp the
     // range to the maximum value supported by the console GPU and hope for the best.
-    min_depth = MathUtil::Clamp(min_depth, 0.0f, GX_MAX_DEPTH);
-    max_depth = MathUtil::Clamp(max_depth, 0.0f, GX_MAX_DEPTH);
+    min_depth = std::clamp(min_depth, 0.0f, GX_MAX_DEPTH);
+    max_depth = std::clamp(max_depth, 0.0f, GX_MAX_DEPTH);
   }
 
   if (g_renderer->UseVertexDepthRange())
@@ -131,10 +134,10 @@ void SetViewport()
   {
     const float max_width = static_cast<float>(g_renderer->GetCurrentFramebuffer()->GetWidth());
     const float max_height = static_cast<float>(g_renderer->GetCurrentFramebuffer()->GetHeight());
-    x = MathUtil::Clamp(x, 0.0f, max_width - 1.0f);
-    y = MathUtil::Clamp(y, 0.0f, max_height - 1.0f);
-    width = MathUtil::Clamp(width, 1.0f, max_width - x);
-    height = MathUtil::Clamp(height, 1.0f, max_height - y);
+    x = std::clamp(x, 0.0f, max_width - 1.0f);
+    y = std::clamp(y, 0.0f, max_height - 1.0f);
+    width = std::clamp(width, 1.0f, max_width - x);
+    height = std::clamp(height, 1.0f, max_height - y);
   }
 
   // Lower-left flip.
@@ -172,7 +175,7 @@ void SetBlendMode()
     - convert the RGBA8 color to RGBA6/RGB8/RGB565 and convert it to RGBA8 again
     - convert the Z24 depth value to Z16 and back to Z24
 */
-void ClearScreen(const EFBRectangle& rc)
+void ClearScreen(const MathUtil::Rectangle<int>& rc)
 {
   bool colorEnable = (bpmem.blendmode.colorupdate != 0);
   bool alphaEnable = (bpmem.blendmode.alphaupdate != 0);

@@ -15,10 +15,10 @@
 #pragma once
 
 #include <array>
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -27,13 +27,12 @@
 #include "Common/Event.h"
 #include "Common/Flag.h"
 #include "Common/MathUtil.h"
-#include "VideoCommon/AVIDump.h"
 #include "VideoCommon/AsyncShaderCompiler.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/FPSCounter.h"
+#include "VideoCommon/FrameDump.h"
 #include "VideoCommon/RenderState.h"
 #include "VideoCommon/TextureConfig.h"
-#include "VideoCommon/VideoCommon.h"
 
 class AbstractFramebuffer;
 class AbstractPipeline;
@@ -41,6 +40,8 @@ class AbstractShader;
 class AbstractTexture;
 class AbstractStagingTexture;
 class NativeVertexFormat;
+class NetPlayChatUI;
+class PointerWrap;
 struct TextureConfig;
 struct ComputePipelineConfig;
 struct AbstractPipelineConfig;
@@ -49,11 +50,12 @@ enum class ShaderStage;
 enum class EFBAccessType;
 enum class EFBReinterpretType;
 enum class StagingTextureType;
+enum class AspectMode;
 
 namespace VideoCommon
 {
 class PostProcessing;
-}
+}  // namespace VideoCommon
 
 struct EfbPokeData
 {
@@ -123,16 +125,15 @@ public:
   virtual void PresentBackbuffer() {}
 
   // Shader modules/objects.
-  virtual std::unique_ptr<AbstractShader>
-  CreateShaderFromSource(ShaderStage stage, const char* source, size_t length) = 0;
+  virtual std::unique_ptr<AbstractShader> CreateShaderFromSource(ShaderStage stage,
+                                                                 std::string_view source) = 0;
   virtual std::unique_ptr<AbstractShader>
   CreateShaderFromBinary(ShaderStage stage, const void* data, size_t length) = 0;
   virtual std::unique_ptr<NativeVertexFormat>
   CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl) = 0;
-  virtual std::unique_ptr<AbstractPipeline>
-  CreatePipeline(const AbstractPipelineConfig& config) = 0;
-  std::unique_ptr<AbstractShader> CreateShaderFromSource(ShaderStage stage,
-                                                         const std::string& source);
+  virtual std::unique_ptr<AbstractPipeline> CreatePipeline(const AbstractPipelineConfig& config,
+                                                           const void* cache_data = nullptr,
+                                                           size_t cache_data_length = 0) = 0;
 
   AbstractFramebuffer* GetCurrentFramebuffer() const { return m_current_framebuffer; }
 
@@ -159,23 +160,33 @@ public:
   // Converts an upper-left to lower-left if required by the backend, optionally
   // clamping to the framebuffer size.
   MathUtil::Rectangle<int> ConvertFramebufferRectangle(const MathUtil::Rectangle<int>& rect,
-                                                       u32 fb_width, u32 fb_height);
-  MathUtil::Rectangle<int> ConvertFramebufferRectangle(const MathUtil::Rectangle<int>& rect,
-                                                       const AbstractFramebuffer* framebuffer);
+                                                       u32 fb_width, u32 fb_height) const;
+  MathUtil::Rectangle<int>
+  ConvertFramebufferRectangle(const MathUtil::Rectangle<int>& rect,
+                              const AbstractFramebuffer* framebuffer) const;
 
   // EFB coordinate conversion functions
   // Use this to convert a whole native EFB rect to backbuffer coordinates
-  TargetRectangle ConvertEFBRectangle(const EFBRectangle& rc);
+  MathUtil::Rectangle<int> ConvertEFBRectangle(const MathUtil::Rectangle<int>& rc) const;
 
-  const TargetRectangle& GetTargetRectangle() const { return m_target_rectangle; }
+  const MathUtil::Rectangle<int>& GetTargetRectangle() const { return m_target_rectangle; }
   float CalculateDrawAspectRatio() const;
+
+  // Crops the target rectangle to the framebuffer dimensions, reducing the size of the source
+  // rectangle if it is greater. Works even if the source and target rectangles don't have a
+  // 1:1 pixel mapping, scaling as appropriate.
+  void AdjustRectanglesToFitBounds(MathUtil::Rectangle<int>* target_rect,
+                                   MathUtil::Rectangle<int>* source_rect, int fb_width,
+                                   int fb_height);
 
   std::tuple<float, float> ScaleToDisplayAspectRatio(int width, int height) const;
   void UpdateDrawRectangle();
 
+  std::tuple<float, float> ApplyStandardAspectCrop(float width, float height) const;
+
   // Use this to convert a single target rectangle to two stereo rectangles
-  std::tuple<TargetRectangle, TargetRectangle>
-  ConvertStereoRectangle(const TargetRectangle& rc) const;
+  std::tuple<MathUtil::Rectangle<int>, MathUtil::Rectangle<int>>
+  ConvertStereoRectangle(const MathUtil::Rectangle<int>& rc) const;
 
   unsigned int GetEFBScale() const;
 
@@ -188,17 +199,14 @@ public:
   float EFBToScaledYf(float y) const;
 
   // Random utilities
-  void SaveScreenshot(const std::string& filename, bool wait_for_completion);
+  void SaveScreenshot(std::string filename, bool wait_for_completion);
   void DrawDebugText();
 
-  // ImGui initialization depends on being able to create textures and pipelines, so do it last.
-  bool InitializeImGui();
-
-  virtual void ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaEnable, bool zEnable,
-                           u32 color, u32 z);
+  virtual void ClearScreen(const MathUtil::Rectangle<int>& rc, bool colorEnable, bool alphaEnable,
+                           bool zEnable, u32 color, u32 z);
   virtual void ReinterpretPixelData(EFBReinterpretType convtype);
-  void RenderToXFB(u32 xfbAddr, const EFBRectangle& sourceRc, u32 fbStride, u32 fbHeight,
-                   float Gamma = 1.0f);
+  void RenderToXFB(u32 xfbAddr, const MathUtil::Rectangle<int>& sourceRc, u32 fbStride,
+                   u32 fbHeight, float Gamma = 1.0f);
 
   virtual u32 AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data);
   virtual void PokeEFB(EFBAccessType type, const EfbPokeData* points, size_t num_points);
@@ -211,26 +219,35 @@ public:
   virtual void WaitForGPUIdle() {}
 
   // Finish up the current frame, print some stats
-  void Swap(u32 xfbAddr, u32 fbWidth, u32 fbStride, u32 fbHeight, const EFBRectangle& rc,
-            u64 ticks);
+  void Swap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height, u64 ticks);
+
+  void UpdateWidescreenHeuristic();
 
   // Draws the specified XFB buffer to the screen, performing any post-processing.
   // Assumes that the backbuffer has already been bound and cleared.
-  virtual void RenderXFBToScreen(const AbstractTexture* texture, const EFBRectangle& rc);
+  virtual void RenderXFBToScreen(const MathUtil::Rectangle<int>& target_rc,
+                                 const AbstractTexture* source_texture,
+                                 const MathUtil::Rectangle<int>& source_rc);
 
   // Called when the configuration changes, and backend structures need to be updated.
   virtual void OnConfigChanged(u32 bits) {}
 
   PEControl::PixelFormat GetPrevPixelFormat() const { return m_prev_efb_format; }
   void StorePixelFormat(PEControl::PixelFormat new_format) { m_prev_efb_format = new_format; }
+  bool EFBHasAlphaChannel() const;
   VideoCommon::PostProcessing* GetPostProcessor() const { return m_post_processor.get(); }
   // Final surface changing
   // This is called when the surface is resized (WX) or the window changes (Android).
   void ChangeSurface(void* new_surface_handle);
   void ResizeSurface();
   bool UseVertexDepthRange() const;
+  void DoState(PointerWrap& p);
 
   virtual std::unique_ptr<VideoCommon::AsyncShaderCompiler> CreateAsyncShaderCompiler();
+
+  // Returns true if a layer-expanding geometry shader should be used when rendering the user
+  // interface and final XFB.
+  bool UseGeometryShaderForUI() const;
 
   // Returns a lock for the ImGui mutex, enabling data structures to be modified from outside.
   // Use with care, only non-drawing functions should be called from outside the video thread,
@@ -264,6 +281,12 @@ protected:
   void CheckFifoRecording();
   void RecordVideoMemory();
 
+  // ImGui initialization depends on being able to create textures and pipelines, so do it last.
+  bool InitializeImGui();
+
+  // Recompiles ImGui pipeline - call when stereo mode changes.
+  bool RecompileImGuiPipeline();
+
   // Sets up ImGui state for the next frame.
   // This function itself acquires the ImGui lock, so it should not be held.
   void BeginImGuiFrame();
@@ -282,7 +305,9 @@ protected:
   Common::Event m_screenshot_completed;
   std::mutex m_screenshot_lock;
   std::string m_screenshot_name;
-  bool m_aspect_wide = false;
+
+  bool m_is_game_widescreen = false;
+  bool m_was_orthographically_anamorphic = false;
 
   // The framebuffer size
   int m_target_width = 1;
@@ -293,7 +318,7 @@ protected:
   int m_backbuffer_height = 0;
   float m_backbuffer_scale = 1.0f;
   AbstractTextureFormat m_backbuffer_format = AbstractTextureFormat::Undefined;
-  TargetRectangle m_target_rectangle = {};
+  MathUtil::Rectangle<int> m_target_rectangle = {};
   int m_frame_count = 0;
 
   FPSCounter m_fps_counter;
@@ -314,7 +339,7 @@ protected:
 
 private:
   void RunFrameDumps();
-  std::tuple<int, int> CalculateOutputDimensions(int width, int height);
+  std::tuple<int, int> CalculateOutputDimensions(int width, int height) const;
 
   PEControl::PixelFormat m_prev_efb_format = PEControl::INVALID_FMT;
   unsigned int m_efb_scale = 1;
@@ -336,36 +361,34 @@ private:
     int width;
     int height;
     int stride;
-    AVIDump::Frame state;
+    FrameDump::Frame state;
   } m_frame_dump_config;
 
   // Texture used for screenshot/frame dumping
   std::unique_ptr<AbstractTexture> m_frame_dump_render_texture;
   std::unique_ptr<AbstractFramebuffer> m_frame_dump_render_framebuffer;
   std::array<std::unique_ptr<AbstractStagingTexture>, 2> m_frame_dump_readback_textures;
-  AVIDump::Frame m_last_frame_state;
+  FrameDump::Frame m_last_frame_state;
   bool m_last_frame_exported = false;
 
   // Tracking of XFB textures so we don't render duplicate frames.
-  AbstractTexture* m_last_xfb_texture = nullptr;
   u64 m_last_xfb_id = std::numeric_limits<u64>::max();
   u64 m_last_xfb_ticks = 0;
-  EFBRectangle m_last_xfb_region;
-
-  // Note: Only used for auto-ir
-  u32 m_last_xfb_width = MAX_XFB_WIDTH;
-  u32 m_last_xfb_height = MAX_XFB_HEIGHT;
+  u32 m_last_xfb_addr = 0;
+  u32 m_last_xfb_width = 0;
+  u32 m_last_xfb_stride = 0;
+  u32 m_last_xfb_height = 0;
 
   // NOTE: The methods below are called on the framedumping thread.
-  bool StartFrameDumpToAVI(const FrameDumpConfig& config);
-  void DumpFrameToAVI(const FrameDumpConfig& config);
-  void StopFrameDumpToAVI();
+  bool StartFrameDumpToFFMPEG(const FrameDumpConfig& config);
+  void DumpFrameToFFMPEG(const FrameDumpConfig& config);
+  void StopFrameDumpToFFMPEG();
   std::string GetFrameDumpNextImageFileName() const;
   bool StartFrameDumpToImage(const FrameDumpConfig& config);
   void DumpFrameToImage(const FrameDumpConfig& config);
   void ShutdownFrameDumping();
 
-  bool IsFrameDumping();
+  bool IsFrameDumping() const;
 
   // Checks that the frame dump render texture exists and is the correct size.
   bool CheckFrameDumpRenderTexture(u32 target_width, u32 target_height);
@@ -374,16 +397,19 @@ private:
   bool CheckFrameDumpReadbackTexture(u32 target_width, u32 target_height);
 
   // Fills the frame dump staging texture with the current XFB texture.
-  void DumpCurrentFrame();
+  void DumpCurrentFrame(const AbstractTexture* src_texture,
+                        const MathUtil::Rectangle<int>& src_rect, u64 ticks);
 
   // Asynchronously encodes the specified pointer of frame data to the frame dump.
-  void DumpFrameData(const u8* data, int w, int h, int stride, const AVIDump::Frame& state);
+  void DumpFrameData(const u8* data, int w, int h, int stride, const FrameDump::Frame& state);
 
   // Ensures all rendered frames are queued for encoding.
   void FlushFrameDump();
 
   // Ensures all encoded frames have been written to the output file.
   void FinishFrameData();
+
+  std::unique_ptr<NetPlayChatUI> m_netplay_chat_ui;
 };
 
 extern std::unique_ptr<Renderer> g_renderer;

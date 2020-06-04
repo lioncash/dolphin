@@ -58,6 +58,11 @@ public final class SettingsActivityPresenter
       if (!TextUtils.isEmpty(gameId))
       {
         mSettings.loadSettings(gameId, mView);
+
+        if (mSettings.gameIniContainsJunk())
+        {
+          mView.showGameIniJunkDeletionQuestion();
+        }
       }
       else
       {
@@ -118,6 +123,12 @@ public final class SettingsActivityPresenter
     return mSettings;
   }
 
+  public void clearSettings()
+  {
+    mSettings.clearSettings();
+    onSettingChanged();
+  }
+
   public void onStop(boolean finishing)
   {
     if (directoryStateReceiver != null)
@@ -173,6 +184,11 @@ public final class SettingsActivityPresenter
     outState.putBoolean(KEY_SHOULD_SAVE, mShouldSave);
   }
 
+  public boolean shouldSave()
+  {
+    return mShouldSave;
+  }
+
   public void onGcPadSettingChanged(MenuTag key, int value)
   {
     if (value != 0) // Not disabled
@@ -205,5 +221,10 @@ public final class SettingsActivityPresenter
       bundle.putInt(SettingsFragmentPresenter.ARG_CONTROLLER_TYPE, value);
       mView.showSettingsFragment(menuTag, bundle, true, gameId);
     }
+  }
+
+  public void onFileConfirmed(String file)
+  {
+    SettingsAdapter.onFilePickerConfirmation(file);
   }
 }

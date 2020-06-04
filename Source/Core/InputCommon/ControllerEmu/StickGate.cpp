@@ -4,7 +4,10 @@
 
 #include "InputCommon/ControllerEmu/StickGate.h"
 
+#include <algorithm>
 #include <cmath>
+
+#include <fmt/format.h>
 
 #include "Common/Common.h"
 #include "Common/MathUtil.h"
@@ -18,6 +21,9 @@ namespace
 constexpr auto CALIBRATION_CONFIG_NAME = "Calibration";
 constexpr auto CALIBRATION_DEFAULT_VALUE = 1.0;
 constexpr auto CALIBRATION_CONFIG_SCALE = 100;
+
+constexpr auto CENTER_CONFIG_NAME = "Center";
+constexpr auto CENTER_CONFIG_SCALE = 100;
 
 // Calculate distance to intersection of a ray with a line defined by two points.
 double GetRayLineIntersection(Common::DVec2 ray, Common::DVec2 point1, Common::DVec2 point2)
@@ -48,7 +54,7 @@ constexpr int ReshapableInput::CALIBRATION_SAMPLE_COUNT;
 
 std::optional<u32> StickGate::GetIdealCalibrationSampleCount() const
 {
-  return {};
+  return std::nullopt;
 }
 
 OctagonStickGate::OctagonStickGate(ControlState radius) : m_radius(radius)
@@ -80,6 +86,12 @@ ControlState RoundStickGate::GetRadiusAtAngle(double) const
   return m_radius;
 }
 
+std::optional<u32> RoundStickGate::GetIdealCalibrationSampleCount() const
+{
+  // The "radius" is the same at every angle so a single sample is enough.
+  return 1;
+}
+
 SquareStickGate::SquareStickGate(ControlState half_width) : m_half_width(half_width)
 {
 }
@@ -100,13 +112,13 @@ std::optional<u32> SquareStickGate::GetIdealCalibrationSampleCount() const
 ReshapableInput::ReshapableInput(std::string name, std::string ui_name, GroupType type)
     : ControlGroup(std::move(name), std::move(ui_name), type)
 {
-  numeric_settings.emplace_back(std::make_unique<NumericSetting>(_trans("Dead Zone"), 0, 0, 50));
+  AddDeadzoneSetting(&m_deadzone_setting, 50);
 }
 
 ControlState ReshapableInput::GetDeadzoneRadiusAtAngle(double angle) const
 {
   // FYI: deadzone is scaled by input radius which allows the shape to match.
-  return GetInputRadiusAtAngle(angle) * numeric_settings[SETTING_DEADZONE]->GetValue();
+  return GetInputRadiusAtAngle(angle) * GetDeadzonePercentage();
 }
 
 ControlState ReshapableInput::GetInputRadiusAtAngle(double angle) const
@@ -118,6 +130,11 @@ ControlState ReshapableInput::GetInputRadiusAtAngle(double angle) const
   }
 
   return GetCalibrationDataRadiusAtAngle(m_calibration, angle);
+}
+
+ControlState ReshapableInput::GetDeadzonePercentage() const
+{
+  return m_deadzone_setting.GetValue() / 100;
 }
 
 ControlState ReshapableInput::GetCalibrationDataRadiusAtAngle(const CalibrationData& data,
@@ -166,7 +183,8 @@ void ReshapableInput::UpdateCalibrationData(CalibrationData& data, Common::DVec2
   auto& calibration_sample = data[calibration_index];
 
   // Update closest sample from provided x,y.
-  calibration_sample = std::max(calibration_sample, point.Length());
+  calibration_sample = std::clamp(point.Length(), calibration_sample,
+                                  SquareStickGate(1).GetRadiusAtAngle(calibration_angle));
 
   // Here we update all other samples in our calibration vector to maintain
   // a convex polygon containing our new calibration point.
@@ -208,6 +226,16 @@ void ReshapableInput::SetCalibrationData(CalibrationData data)
   m_calibration = std::move(data);
 }
 
+const ReshapableInput::ReshapeData& ReshapableInput::GetCenter() const
+{
+  return m_center;
+}
+
+void ReshapableInput::SetCenter(ReshapableInput::ReshapeData center)
+{
+  m_center = center;
+}
+
 void ReshapableInput::LoadConfig(IniFile::Section* section, const std::string& default_device,
                                  const std::string& base_name)
 {
@@ -226,6 +254,20 @@ void ReshapableInput::LoadConfig(IniFile::Section* section, const std::string& d
     if (TryParse(*(it++), &sample))
       sample /= CALIBRATION_CONFIG_SCALE;
   }
+
+  section->Get(group + CENTER_CONFIG_NAME, &load_str, "");
+  const auto center_data = SplitString(load_str, ' ');
+
+  m_center = Common::DVec2();
+
+  if (center_data.size() == 2)
+  {
+    if (TryParse(center_data[0], &m_center.x))
+      m_center.x /= CENTER_CONFIG_SCALE;
+
+    if (TryParse(center_data[1], &m_center.y))
+      m_center.y /= CENTER_CONFIG_SCALE;
+  }
 }
 
 void ReshapableInput::SaveConfig(IniFile::Section* section, const std::string& default_device,
@@ -237,13 +279,22 @@ void ReshapableInput::SaveConfig(IniFile::Section* section, const std::string& d
   std::vector<std::string> save_data(m_calibration.size());
   std::transform(
       m_calibration.begin(), m_calibration.end(), save_data.begin(),
-      [](ControlState val) { return StringFromFormat("%.2f", val * CALIBRATION_CONFIG_SCALE); });
+      [](ControlState val) { return fmt::format("{:.2f}", val * CALIBRATION_CONFIG_SCALE); });
   section->Set(group + CALIBRATION_CONFIG_NAME, JoinStrings(save_data, " "), "");
+
+  // Save center value.
+  static constexpr char center_format[] = "{:.2f} {:.2f}";
+  const auto center_data = fmt::format(center_format, m_center.x * CENTER_CONFIG_SCALE,
+                                       m_center.y * CENTER_CONFIG_SCALE);
+  section->Set(group + CENTER_CONFIG_NAME, center_data, fmt::format(center_format, 0.0, 0.0));
 }
 
 ReshapableInput::ReshapeData ReshapableInput::Reshape(ControlState x, ControlState y,
                                                       ControlState modifier)
 {
+  x -= m_center.x;
+  y -= m_center.y;
+
   // TODO: make the AtAngle functions work with negative angles:
   const ControlState angle = std::atan2(y, x) + MathUtil::TAU;
 
@@ -267,14 +318,13 @@ ReshapableInput::ReshapeData ReshapableInput::Reshape(ControlState x, ControlSta
   }
 
   // Apply deadzone as a percentage of the user-defined calibration shape/size:
-  const ControlState deadzone = numeric_settings[SETTING_DEADZONE]->GetValue();
-  dist = std::max(0.0, dist - deadzone) / (1.0 - deadzone);
+  dist = ApplyDeadzone(dist, GetDeadzonePercentage());
 
   // Scale to the gate shape/radius:
   dist *= gate_max_dist;
 
-  return {MathUtil::Clamp(std::cos(angle) * dist, -1.0, 1.0),
-          MathUtil::Clamp(std::sin(angle) * dist, -1.0, 1.0)};
+  return {std::clamp(std::cos(angle) * dist, -1.0, 1.0),
+          std::clamp(std::sin(angle) * dist, -1.0, 1.0)};
 }
 
 }  // namespace ControllerEmu

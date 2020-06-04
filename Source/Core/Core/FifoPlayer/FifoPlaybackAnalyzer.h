@@ -9,11 +9,18 @@
 
 #include "Core/FifoPlayer/FifoDataFile.h"
 
+struct ClearInfo
+{
+  u32 address;
+  u32 value;
+};
+
 struct AnalyzedFrameInfo
 {
   std::vector<u32> objectStarts;
   std::vector<u32> objectEnds;
   std::vector<MemoryUpdate> memoryUpdates;
+  std::vector<ClearInfo> clears;
 };
 
 namespace FifoPlaybackAnalyzer

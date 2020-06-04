@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <array>
+#include <atomic>
+
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
 
@@ -23,6 +26,9 @@ enum class ClassicGroup;
 enum class GuitarGroup;
 enum class DrumsGroup;
 enum class TurntableGroup;
+enum class UDrawTabletGroup;
+enum class DrawsomeTabletGroup;
+enum class TaTaConGroup;
 }  // namespace WiimoteEmu
 
 enum
@@ -38,14 +44,18 @@ enum
 
 #define WIIMOTE_INI_NAME "WiimoteNew"
 
-enum
+enum class WiimoteSource
 {
-  WIIMOTE_SRC_NONE = 0,
-  WIIMOTE_SRC_EMU = 1,
-  WIIMOTE_SRC_REAL = 2,
+  None = 0,
+  Emulated = 1,
+  Real = 2,
 };
 
-extern unsigned int g_wiimote_sources[MAX_BBMOTES];
+namespace WiimoteCommon
+{
+WiimoteSource GetSource(unsigned int index);
+void SetSource(unsigned int index, WiimoteSource source);
+}  // namespace WiimoteCommon
 
 namespace Wiimote
 {
@@ -57,6 +67,8 @@ enum class InitializeMode
 
 // The Real Wii Remote sends report every ~5ms (200 Hz).
 constexpr int UPDATE_FREQ = 200;
+// Custom channel ID used in ControlChannel to indicate disconnects
+constexpr int DOLPHIN_DISCONNET_CONTROL_CHANNEL = 99;
 
 void Shutdown();
 void Initialize(InitializeMode init_mode);
@@ -66,7 +78,6 @@ void LoadConfig();
 void Resume();
 void Pause();
 
-unsigned int GetAttached();
 void DoState(PointerWrap& p);
 InputConfig* GetConfig();
 ControllerEmu::ControlGroup* GetWiimoteGroup(int number, WiimoteEmu::WiimoteGroup group);
@@ -75,6 +86,10 @@ ControllerEmu::ControlGroup* GetClassicGroup(int number, WiimoteEmu::ClassicGrou
 ControllerEmu::ControlGroup* GetGuitarGroup(int number, WiimoteEmu::GuitarGroup group);
 ControllerEmu::ControlGroup* GetDrumsGroup(int number, WiimoteEmu::DrumsGroup group);
 ControllerEmu::ControlGroup* GetTurntableGroup(int number, WiimoteEmu::TurntableGroup group);
+ControllerEmu::ControlGroup* GetUDrawTabletGroup(int number, WiimoteEmu::UDrawTabletGroup group);
+ControllerEmu::ControlGroup* GetDrawsomeTabletGroup(int number,
+                                                    WiimoteEmu::DrawsomeTabletGroup group);
+ControllerEmu::ControlGroup* GetTaTaConGroup(int number, WiimoteEmu::TaTaConGroup group);
 
 void ControlChannel(int number, u16 channel_id, const void* data, u32 size);
 void InterruptChannel(int number, u16 channel_id, const void* data, u32 size);
@@ -93,4 +108,5 @@ void Pause();
 void Refresh();
 
 void LoadSettings();
+
 }  // namespace WiimoteReal

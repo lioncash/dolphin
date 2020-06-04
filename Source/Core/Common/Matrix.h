@@ -6,18 +6,35 @@
 
 #include <array>
 #include <cmath>
+#include <functional>
+#include <type_traits>
 
 // Tiny matrix/vector library.
 // Used for things like Free-Look in the gfx backend.
 
 namespace Common
 {
-union Vec3
+template <typename T>
+union TVec3
 {
-  Vec3() = default;
-  Vec3(float _x, float _y, float _z) : data{_x, _y, _z} {}
+  TVec3() = default;
+  TVec3(T _x, T _y, T _z) : data{_x, _y, _z} {}
 
-  Vec3& operator+=(const Vec3& rhs)
+  template <typename OtherT>
+  explicit TVec3(const TVec3<OtherT>& other) : TVec3(other.x, other.y, other.z)
+  {
+  }
+
+  TVec3 Cross(const TVec3& rhs) const
+  {
+    return {(y * rhs.z) - (rhs.y * z), (z * rhs.x) - (rhs.z * x), (x * rhs.y) - (rhs.x * y)};
+  }
+  T Dot(const TVec3& other) const { return x * other.x + y * other.y + z * other.z; }
+  T LengthSquared() const { return Dot(*this); }
+  T Length() const { return std::sqrt(LengthSquared()); }
+  TVec3 Normalized() const { return *this / Length(); }
+
+  TVec3& operator+=(const TVec3& rhs)
   {
     x += rhs.x;
     y += rhs.y;
@@ -25,26 +42,175 @@ union Vec3
     return *this;
   }
 
-  std::array<float, 3> data = {};
+  TVec3& operator-=(const TVec3& rhs)
+  {
+    x -= rhs.x;
+    y -= rhs.y;
+    z -= rhs.z;
+    return *this;
+  }
+
+  TVec3& operator*=(const TVec3& rhs)
+  {
+    x *= rhs.x;
+    y *= rhs.y;
+    z *= rhs.z;
+    return *this;
+  }
+
+  TVec3& operator/=(const TVec3& rhs)
+  {
+    x /= rhs.x;
+    y /= rhs.y;
+    z /= rhs.z;
+    return *this;
+  }
+
+  TVec3 operator-() const { return {-x, -y, -z}; }
+
+  // Apply function to each element and return the result.
+  template <typename F>
+  auto Map(F&& f) const -> TVec3<decltype(f(T{}))>
+  {
+    return {f(x), f(y), f(z)};
+  }
+
+  template <typename F, typename T2>
+  auto Map(F&& f, const TVec3<T2>& t) const -> TVec3<decltype(f(T{}, t.x))>
+  {
+    return {f(x, t.x), f(y, t.y), f(z, t.z)};
+  }
+
+  template <typename F, typename T2>
+  auto Map(F&& f, T2 scalar) const -> TVec3<decltype(f(T{}, scalar))>
+  {
+    return {f(x, scalar), f(y, scalar), f(z, scalar)};
+  }
+
+  std::array<T, 3> data = {};
 
   struct
   {
-    float x;
-    float y;
-    float z;
+    T x;
+    T y;
+    T z;
   };
 };
 
-inline Vec3 operator+(Vec3 lhs, const Vec3& rhs)
+template <typename T>
+TVec3<bool> operator<(const TVec3<T>& lhs, const TVec3<T>& rhs)
 {
-  return lhs += rhs;
+  return lhs.Map(std::less<T>{}, rhs);
 }
+
+inline TVec3<bool> operator!(const TVec3<bool>& vec)
+{
+  return {!vec.x, !vec.y, !vec.z};
+}
+
+template <typename T>
+auto operator+(const TVec3<T>& lhs, const TVec3<T>& rhs) -> TVec3<decltype(lhs.x + rhs.x)>
+{
+  return lhs.Map(std::plus<decltype(lhs.x + rhs.x)>{}, rhs);
+}
+
+template <typename T>
+auto operator-(const TVec3<T>& lhs, const TVec3<T>& rhs) -> TVec3<decltype(lhs.x - rhs.x)>
+{
+  return lhs.Map(std::minus<decltype(lhs.x - rhs.x)>{}, rhs);
+}
+
+template <typename T1, typename T2>
+auto operator*(const TVec3<T1>& lhs, const TVec3<T2>& rhs) -> TVec3<decltype(lhs.x * rhs.x)>
+{
+  return lhs.Map(std::multiplies<decltype(lhs.x * rhs.x)>{}, rhs);
+}
+
+template <typename T>
+auto operator/(const TVec3<T>& lhs, const TVec3<T>& rhs) -> TVec3<decltype(lhs.x / rhs.x)>
+{
+  return lhs.Map(std::divides<decltype(lhs.x / rhs.x)>{}, rhs);
+}
+
+template <typename T1, typename T2>
+auto operator*(const TVec3<T1>& lhs, T2 scalar) -> TVec3<decltype(lhs.x * scalar)>
+{
+  return lhs.Map(std::multiplies<decltype(lhs.x * scalar)>{}, scalar);
+}
+
+template <typename T1, typename T2>
+auto operator/(const TVec3<T1>& lhs, T2 scalar) -> TVec3<decltype(lhs.x / scalar)>
+{
+  return lhs.Map(std::divides<decltype(lhs.x / scalar)>{}, scalar);
+}
+
+using Vec3 = TVec3<float>;
+using DVec3 = TVec3<double>;
+
+template <typename T>
+union TVec4
+{
+  TVec4() = default;
+  TVec4(TVec3<T> _vec, T _w) : TVec4{_vec.x, _vec.y, _vec.z, _w} {}
+  TVec4(T _x, T _y, T _z, T _w) : data{_x, _y, _z, _w} {}
+
+  TVec4& operator*=(const TVec4& rhs)
+  {
+    x *= rhs.x;
+    y *= rhs.y;
+    z *= rhs.z;
+    w *= rhs.w;
+    return *this;
+  }
+
+  TVec4& operator/=(const TVec4& rhs)
+  {
+    x /= rhs.x;
+    y /= rhs.y;
+    z /= rhs.z;
+    w /= rhs.w;
+    return *this;
+  }
+
+  TVec4& operator*=(T scalar) { return *this *= TVec4{scalar, scalar, scalar, scalar}; }
+  TVec4& operator/=(T scalar) { return *this /= TVec4{scalar, scalar, scalar, scalar}; }
+
+  std::array<T, 4> data = {};
+
+  struct
+  {
+    T x;
+    T y;
+    T z;
+    T w;
+  };
+};
+
+template <typename T>
+TVec4<T> operator*(TVec4<T> lhs, std::common_type_t<T> scalar)
+{
+  return lhs *= scalar;
+}
+
+template <typename T>
+TVec4<T> operator/(TVec4<T> lhs, std::common_type_t<T> scalar)
+{
+  return lhs /= scalar;
+}
+
+using Vec4 = TVec4<float>;
+using DVec4 = TVec4<double>;
 
 template <typename T>
 union TVec2
 {
   TVec2() = default;
   TVec2(T _x, T _y) : data{_x, _y} {}
+
+  template <typename OtherT>
+  explicit TVec2(const TVec2<OtherT>& other) : TVec2(other.x, other.y)
+  {
+  }
 
   T Cross(const TVec2& rhs) const { return (x * rhs.y) - (y * rhs.x); }
   T Dot(const TVec2& rhs) const { return (x * rhs.x) + (y * rhs.y); }
@@ -66,10 +232,31 @@ union TVec2
     return *this;
   }
 
+  TVec2& operator*=(const TVec2& rhs)
+  {
+    x *= rhs.x;
+    y *= rhs.y;
+    return *this;
+  }
+
+  TVec2& operator/=(const TVec2& rhs)
+  {
+    x /= rhs.x;
+    y /= rhs.y;
+    return *this;
+  }
+
   TVec2& operator*=(T scalar)
   {
     x *= scalar;
     y *= scalar;
+    return *this;
+  }
+
+  TVec2& operator/=(T scalar)
+  {
+    x /= scalar;
+    y /= scalar;
     return *this;
   }
 
@@ -85,6 +272,17 @@ union TVec2
 };
 
 template <typename T>
+TVec2<bool> operator<(const TVec2<T>& lhs, const TVec2<T>& rhs)
+{
+  return {lhs.x < rhs.x, lhs.y < rhs.y};
+}
+
+inline TVec2<bool> operator!(const TVec2<bool>& vec)
+{
+  return {!vec.x, !vec.y};
+}
+
+template <typename T>
 TVec2<T> operator+(TVec2<T> lhs, const TVec2<T>& rhs)
 {
   return lhs += rhs;
@@ -97,9 +295,27 @@ TVec2<T> operator-(TVec2<T> lhs, const TVec2<T>& rhs)
 }
 
 template <typename T>
-TVec2<T> operator*(TVec2<T> lhs, T scalar)
+TVec2<T> operator*(TVec2<T> lhs, const TVec2<T>& rhs)
 {
-  return lhs *= scalar;
+  return lhs *= rhs;
+}
+
+template <typename T>
+TVec2<T> operator/(TVec2<T> lhs, const TVec2<T>& rhs)
+{
+  return lhs /= rhs;
+}
+
+template <typename T, typename T2>
+auto operator*(TVec2<T> lhs, T2 scalar)
+{
+  return TVec2<decltype(lhs.x * scalar)>(lhs) *= scalar;
+}
+
+template <typename T, typename T2>
+auto operator/(TVec2<T> lhs, T2 scalar)
+{
+  return TVec2<decltype(lhs.x / scalar)>(lhs) /= scalar;
 }
 
 using Vec2 = TVec2<float>;
@@ -109,11 +325,14 @@ class Matrix33
 {
 public:
   static Matrix33 Identity();
+  static Matrix33 FromQuaternion(float x, float y, float z, float w);
 
   // Return a rotation matrix around the x,y,z axis
   static Matrix33 RotateX(float rad);
   static Matrix33 RotateY(float rad);
   static Matrix33 RotateZ(float rad);
+
+  static Matrix33 Rotate(float rad, const Vec3& axis);
 
   static Matrix33 Scale(const Vec3& vec);
 
@@ -121,12 +340,15 @@ public:
   static void Multiply(const Matrix33& a, const Matrix33& b, Matrix33* result);
   static void Multiply(const Matrix33& a, const Vec3& vec, Vec3* result);
 
+  Matrix33 Inverted() const;
+
   Matrix33& operator*=(const Matrix33& rhs)
   {
-    Multiply(Matrix33(*this), rhs, this);
+    Multiply(*this, rhs, this);
     return *this;
   }
 
+  // Note: Row-major storage order.
   std::array<float, 9> data;
 };
 
@@ -135,11 +357,10 @@ inline Matrix33 operator*(Matrix33 lhs, const Matrix33& rhs)
   return lhs *= rhs;
 }
 
-inline Vec3 operator*(const Matrix33& lhs, const Vec3& rhs)
+inline Vec3 operator*(const Matrix33& lhs, Vec3 rhs)
 {
-  Vec3 result;
-  Matrix33::Multiply(lhs, rhs, &result);
-  return result;
+  Matrix33::Multiply(lhs, rhs, &rhs);
+  return rhs;
 }
 
 class Matrix44
@@ -151,15 +372,21 @@ public:
 
   static Matrix44 Translate(const Vec3& vec);
   static Matrix44 Shear(const float a, const float b = 0);
+  static Matrix44 Perspective(float fov_y, float aspect_ratio, float z_near, float z_far);
 
   static void Multiply(const Matrix44& a, const Matrix44& b, Matrix44* result);
+  static void Multiply(const Matrix44& a, const Vec4& vec, Vec4* result);
+
+  // For when a vec4 isn't needed a multiplication function that takes a Vec3 and w:
+  Vec3 Transform(const Vec3& point, float w) const;
 
   Matrix44& operator*=(const Matrix44& rhs)
   {
-    Multiply(Matrix44(*this), rhs, this);
+    Multiply(*this, rhs, this);
     return *this;
   }
 
+  // Note: Row-major storage order.
   std::array<float, 16> data;
 };
 
@@ -167,4 +394,11 @@ inline Matrix44 operator*(Matrix44 lhs, const Matrix44& rhs)
 {
   return lhs *= rhs;
 }
+
+inline Vec4 operator*(const Matrix44& lhs, Vec4 rhs)
+{
+  Matrix44::Multiply(lhs, rhs, &rhs);
+  return rhs;
+}
+
 }  // namespace Common

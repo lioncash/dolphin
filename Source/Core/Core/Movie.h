@@ -49,7 +49,7 @@ struct ControllerState
   bool disc : 1;          // Checks for disc being changed
   bool reset : 1;         // Console reset button
   bool is_connected : 1;  // Should controller be treated as connected
-  bool reserved : 1;      // Reserved bits used for padding, 1 bit
+  bool get_origin : 1;    // Special bit to indicate analog origin reset
 
   u8 TriggerL, TriggerR;          // Triggers, 16 bits
   u8 AnalogStickX, AnalogStickY;  // Main Stick, 16 bits
@@ -107,7 +107,7 @@ struct DTMHeader
   bool bNetPlay;
   bool bPAL60;
   u8 language;
-  bool bReducePollingRate;
+  u8 reserved3;
   bool bFollowBranch;
   std::array<u8, 9> reserved;       // Padding for any new config options
   std::array<char, 40> discChange;  // Name of iso file to switch to, for two disc games.

@@ -36,7 +36,7 @@ std::vector<GeckoCode> DownloadCodes(std::string gametdb_id, bool* succeeded)
   std::vector<GeckoCode> gcodes;
 
   // parse the codes
-  std::istringstream ss(reinterpret_cast<const char*>(response->data()));
+  std::istringstream ss(std::string(response->begin(), response->end()));
 
   std::string line;
 
@@ -85,6 +85,11 @@ std::vector<GeckoCode> DownloadCodes(std::string gametdb_id, bool* succeeded)
     {
       std::istringstream ssline(line);
       std::string addr, data;
+
+      // Some locales (e.g. fr_FR.UTF-8) don't split the string stream on space
+      // Use the C locale to workaround this behavior
+      ssline.imbue(std::locale::classic());
+
       ssline >> addr >> data;
       ssline.seekg(0);
 
@@ -139,11 +144,16 @@ std::vector<GeckoCode> LoadCodes(const IniFile& globalIni, const IniFile& localI
     {
       std::istringstream ss(line);
 
+      // Some locales (e.g. fr_FR.UTF-8) don't split the string stream on space
+      // Use the C locale to workaround this behavior
+      ss.imbue(std::locale::classic());
+
       switch ((line)[0])
       {
       // enabled or disabled code
       case '+':
         ss.seekg(1);
+        [[fallthrough]];
       case '$':
         if (!gcode.name.empty())
           gcodes.push_back(gcode);
@@ -253,4 +263,4 @@ void SaveCodes(IniFile& inifile, const std::vector<GeckoCode>& gcodes)
   inifile.SetLines("Gecko", lines);
   inifile.SetLines("Gecko_Enabled", enabledLines);
 }
-}
+}  // namespace Gecko

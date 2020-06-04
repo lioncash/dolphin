@@ -280,11 +280,11 @@ void WiimoteDarwin::DisablePowerAssertionInternal()
   IOBluetoothDevice* device = [l2capChannel device];
   WiimoteReal::WiimoteDarwin* wm = nullptr;
 
-  std::lock_guard<std::mutex> lk(WiimoteReal::g_wiimotes_mutex);
+  std::lock_guard lk(WiimoteReal::g_wiimotes_mutex);
 
   for (int i = 0; i < MAX_WIIMOTES; i++)
   {
-    wm = static_cast<WiimoteReal::WiimoteDarwin*>(WiimoteReal::g_wiimotes[i]);
+    wm = static_cast<WiimoteReal::WiimoteDarwin*>(WiimoteReal::g_wiimotes[i].get());
     if (!wm)
       continue;
     if ([device isEqual:wm->m_btd])
@@ -321,11 +321,11 @@ void WiimoteDarwin::DisablePowerAssertionInternal()
   IOBluetoothDevice* device = [l2capChannel device];
   WiimoteReal::WiimoteDarwin* wm = nullptr;
 
-  std::lock_guard<std::mutex> lk(WiimoteReal::g_wiimotes_mutex);
+  std::lock_guard lk(WiimoteReal::g_wiimotes_mutex);
 
   for (int i = 0; i < MAX_WIIMOTES; i++)
   {
-    wm = static_cast<WiimoteReal::WiimoteDarwin*>(WiimoteReal::g_wiimotes[i]);
+    wm = static_cast<WiimoteReal::WiimoteDarwin*>(WiimoteReal::g_wiimotes[i].get());
     if (!wm)
       continue;
     if ([device isEqual:wm->m_btd])

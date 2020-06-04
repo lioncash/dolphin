@@ -35,12 +35,12 @@ void PadMappingDialog::CreateWidgets()
     m_wii_boxes[i] = new QComboBox;
 
     m_main_layout->addWidget(new QLabel(tr("GC Port %1").arg(i + 1)), 0, i);
-    m_main_layout->addWidget(new QLabel(tr("Wii Remote %1").arg(i + 1)), 0, 4 + i);
     m_main_layout->addWidget(m_gc_boxes[i], 1, i);
-    m_main_layout->addWidget(m_wii_boxes[i], 1, 4 + i);
+    m_main_layout->addWidget(new QLabel(tr("Wii Remote %1").arg(i + 1)), 2, i);
+    m_main_layout->addWidget(m_wii_boxes[i], 3, i);
   }
 
-  m_main_layout->addWidget(m_button_box, 2, 0, 1, -1);
+  m_main_layout->addWidget(m_button_box, 4, 0, 1, -1);
 
   setLayout(m_main_layout);
 }
@@ -48,11 +48,11 @@ void PadMappingDialog::CreateWidgets()
 void PadMappingDialog::ConnectWidgets()
 {
   connect(m_button_box, &QDialogButtonBox::accepted, this, &QDialog::accept);
-  for (auto& combo_group : {m_gc_boxes, m_wii_boxes})
+  for (const auto& combo_group : {m_gc_boxes, m_wii_boxes})
   {
-    for (auto& combo : combo_group)
+    for (const auto& combo : combo_group)
     {
-      connect(combo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
+      connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this,
               &PadMappingDialog::OnMappingChanged);
     }
   }

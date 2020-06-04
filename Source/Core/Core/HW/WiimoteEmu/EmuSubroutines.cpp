@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <iterator>
 
 #include "Common/BitUtils.h"
 #include "Common/ChunkFile.h"
@@ -12,13 +13,13 @@
 #include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
 #include "Common/Swap.h"
+#include "Core/Analytics.h"
 #include "Core/Core.h"
 #include "Core/HW/WiimoteCommon/WiimoteHid.h"
 #include "Core/HW/WiimoteEmu/WiimoteEmu.h"
 #include "Core/HW/WiimoteReal/WiimoteReal.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Attachments.h"
 #include "InputCommon/ControllerEmu/ControlGroup/ModifySettingsButton.h"
-#include "InputCommon/ControllerEmu/Setting/BooleanSetting.h"
 
 namespace WiimoteEmu
 {
@@ -150,11 +151,17 @@ void Wiimote::SendAck(OutputReportID rpt_id, ErrorCode error_code)
 
 void Wiimote::HandleExtensionSwap()
 {
+  if (WIIMOTE_BALANCE_BOARD == m_index)
+  {
+    // Prevent M+ or anything else silly from being attached to a balance board.
+    // In the future if we support an emulated balance board we can force the BB "extension" here.
+    return;
+  }
+
   ExtensionNumber desired_extension_number =
       static_cast<ExtensionNumber>(m_attachments->GetSelectedAttachment());
 
-  // const bool desired_motion_plus = m_motion_plus_setting->GetValue();
-  const bool desired_motion_plus = false;
+  const bool desired_motion_plus = m_motion_plus_setting.GetValue();
 
   // FYI: AttachExtension also connects devices to the i2c bus
 
@@ -229,11 +236,7 @@ void Wiimote::HandleRequestStatus(const OutputReportRequestStatus&)
   // Update status struct
   m_status.extension = m_extension_port.IsDeviceConnected();
 
-  // Based on testing, old WiiLi.org docs, and WiiUse library:
-  // Max battery level seems to be 0xc8 (decimal 200)
-  constexpr u8 MAX_BATTERY_LEVEL = 0xc8;
-
-  m_status.battery = u8(std::lround(m_battery_setting->GetValue() * MAX_BATTERY_LEVEL));
+  m_status.battery = u8(std::lround(m_battery_setting.GetValue() / 100 * MAX_BATTERY_LEVEL));
 
   if (Core::WantsDeterminism())
   {
@@ -251,7 +254,12 @@ void Wiimote::HandleRequestStatus(const OutputReportRequestStatus&)
 
 void Wiimote::HandleWriteData(const OutputReportWriteData& wd)
 {
-  // TODO: Are writes ignored during an active read request?
+  if (m_read_request.size)
+  {
+    // FYI: Writes during an active read will occasionally produce a "busy" (0x4) ack.
+    // We won't simulate that as it often does work. Poorly programmed games may rely on it.
+    WARN_LOG(WIIMOTE, "WriteData: write during active read request.");
+  }
 
   u16 address = Common::swap16(wd.address);
 
@@ -279,18 +287,7 @@ void Wiimote::HandleWriteData(const OutputReportWriteData& wd)
     else
     {
       std::copy_n(wd.data, wd.size, m_eeprom.data.data() + address);
-
-      // Write mii data to file
-      if (address >= 0x0FCA && address < 0x12C0)
-      {
-        // TODO: Only write parts of the Mii block.
-        // TODO: Use fifferent files for different wiimote numbers.
-        std::ofstream file;
-        File::OpenFStream(file, File::GetUserPath(D_SESSION_WIIROOT_IDX) + "/mii.bin",
-                          std::ios::binary | std::ios::out);
-        file.write((char*)m_eeprom.data.data() + 0x0FCA, 0x02f0);
-        file.close();
-      }
+      m_eeprom_dirty = true;
     }
   }
   break;
@@ -387,14 +384,14 @@ void Wiimote::HandleSpeakerData(const WiimoteCommon::OutputReportSpeakerData& rp
   // (important to keep decoder in proper state)
   if (!m_speaker_mute)
   {
-    if (rpt.length > ArraySize(rpt.data))
+    if (rpt.length > std::size(rpt.data))
     {
       ERROR_LOG(WIIMOTE, "Bad speaker data length: %d", rpt.length);
     }
     else
     {
       // Speaker Pan
-      const auto pan = m_options->numeric_settings[0]->GetValue();
+      const auto pan = m_speaker_pan_setting.GetValue() / 100;
 
       m_speaker_logic.SpeakerData(rpt.data, rpt.length, pan);
     }
@@ -409,9 +406,11 @@ void Wiimote::HandleReadData(const OutputReportReadData& rd)
 {
   if (m_read_request.size)
   {
-    // There is already an active read request.
-    // A real wiimote ignores the new one.
-    WARN_LOG(WIIMOTE, "ReadData: ignoring read during active request.");
+    // There is already an active read being processed.
+    WARN_LOG(WIIMOTE, "ReadData: attempting read during active request.");
+
+    // A real wm+ sends a busy ack in this situation.
+    SendAck(OutputReportID::ReadData, ErrorCode::Busy);
     return;
   }
 
@@ -430,7 +429,7 @@ void Wiimote::HandleReadData(const OutputReportReadData& rd)
   // TODO: should this be removed and let Update() take care of it?
   ProcessReadDataRequest();
 
-  // FYI: No "ACK" is sent.
+  // FYI: No "ACK" is sent under normal situations.
 }
 
 bool Wiimote::ProcessReadDataRequest()
@@ -472,18 +471,6 @@ bool Wiimote::ProcessReadDataRequest()
     }
     else
     {
-      // Mii block handling:
-      // TODO: different filename for each wiimote?
-      if (m_read_request.address >= 0x0FCA && m_read_request.address < 0x12C0)
-      {
-        // TODO: Only read the Mii block parts required
-        std::ifstream file;
-        File::OpenFStream(file, (File::GetUserPath(D_SESSION_WIIROOT_IDX) + "/mii.bin").c_str(),
-                          std::ios::binary | std::ios::in);
-        file.read((char*)m_eeprom.data.data() + 0x0FCA, 0x02f0);
-        file.close();
-      }
-
       // Read memory to be sent to Wii
       std::copy_n(m_eeprom.data.data() + m_read_request.address, bytes_to_read, reply.data);
       reply.size_minus_one = bytes_to_read - 1;
@@ -501,6 +488,19 @@ bool Wiimote::ProcessReadDataRequest()
       error_code = ErrorCode::InvalidAddress;
       break;
     }
+
+    // It is possible to bypass data reporting and directly read extension input.
+    // While I am not aware of any games that actually do this,
+    // our NetPlay and TAS methods are completely unprepared for it.
+    const bool is_reading_ext = EncryptedExtension::I2C_ADDR == m_read_request.slave_address &&
+                                m_read_request.address < EncryptedExtension::CONTROLLER_DATA_BYTES;
+    const bool is_reading_ir =
+        CameraLogic::I2C_ADDR == m_read_request.slave_address &&
+        m_read_request.address < CameraLogic::REPORT_DATA_OFFSET + CameraLogic::CAMERA_DATA_BYTES &&
+        m_read_request.address + m_read_request.size > CameraLogic::REPORT_DATA_OFFSET;
+
+    if (is_reading_ext || is_reading_ir)
+      DolphinAnalytics::Instance().ReportGameQuirk(GameQuirk::DIRECTLY_READS_WIIMOTE_INPUT);
 
     // Top byte of address is ignored on the bus, but it IS maintained in the read-reply.
     auto const bytes_read = m_i2c_bus.BusRead(
@@ -579,32 +579,27 @@ void Wiimote::DoState(PointerWrap& p)
   (m_is_motion_plus_attached ? m_motion_plus.GetExtPort() : m_extension_port)
       .AttachExtension(GetActiveExtension());
 
-  m_motion_plus.DoState(p);
-  GetActiveExtension()->DoState(p);
+  if (m_is_motion_plus_attached)
+    m_motion_plus.DoState(p);
+
+  if (m_active_extension != ExtensionNumber::NONE)
+    GetActiveExtension()->DoState(p);
 
   // Dynamics
-  // TODO: clean this up:
-  p.Do(m_shake_step);
+  p.Do(m_swing_state);
+  p.Do(m_tilt_state);
+  p.Do(m_point_state);
+  p.Do(m_shake_state);
+
+  // We'll consider the IMU state part of the user's physical controller state and not sync it.
+  // (m_imu_cursor_state)
 
   p.DoMarker("Wiimote");
-
-  if (p.GetMode() == PointerWrap::MODE_READ)
-    RealState();
 }
 
 ExtensionNumber Wiimote::GetActiveExtensionNumber() const
 {
   return m_active_extension;
-}
-
-void Wiimote::RealState()
-{
-  using namespace WiimoteReal;
-
-  if (g_wiimotes[m_index])
-  {
-    g_wiimotes[m_index]->SetChannel(m_reporting_channel);
-  }
 }
 
 }  // namespace WiimoteEmu

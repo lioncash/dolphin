@@ -18,6 +18,8 @@
 #include <poll.h>
 #endif
 
+#include <fmt/format.h>
+
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
 #include "Common/Logging/Log.h"
@@ -272,8 +274,8 @@ IPCCommandResult NetIPTop::IOCtl(const IOCtlRequest& request)
 
   switch (request.request)
   {
-  case IOCTL_SO_STARTUP:
-    return HandleStartUpRequest(request);
+  case IOCTL_SO_INITINTERFACE:
+    return HandleInitInterfaceRequest(request);
   case IOCTL_SO_SOCKET:
     return HandleSocketRequest(request);
   case IOCTL_SO_ICMPSOCKET:
@@ -313,7 +315,7 @@ IPCCommandResult NetIPTop::IOCtl(const IOCtlRequest& request)
   case IOCTL_SO_ICMPCANCEL:
     return HandleICMPCancelRequest(request);
   default:
-    request.DumpUnknown(GetDeviceName(), LogTypes::IOS_NET);
+    request.DumpUnknown(GetDeviceName(), Common::Log::IOS_NET);
     break;
   }
 
@@ -335,7 +337,7 @@ IPCCommandResult NetIPTop::IOCtlV(const IOCtlVRequest& request)
   case IOCTLV_SO_ICMPPING:
     return HandleICMPPingRequest(request);
   default:
-    request.DumpUnknown(GetDeviceName(), LogTypes::IOS_NET);
+    request.DumpUnknown(GetDeviceName(), Common::Log::IOS_NET);
     break;
   }
 
@@ -347,9 +349,9 @@ void NetIPTop::Update()
   WiiSockMan::GetInstance().Update();
 }
 
-IPCCommandResult NetIPTop::HandleStartUpRequest(const IOCtlRequest& request)
+IPCCommandResult NetIPTop::HandleInitInterfaceRequest(const IOCtlRequest& request)
 {
-  request.Log(GetDeviceName(), LogTypes::IOS_WC24);
+  request.Log(GetDeviceName(), Common::Log::IOS_WC24);
   return GetDefaultReply(IPC_SUCCESS);
 }
 
@@ -402,7 +404,7 @@ IPCCommandResult NetIPTop::HandleDoSockRequest(const IOCtlRequest& request)
 
 IPCCommandResult NetIPTop::HandleShutdownRequest(const IOCtlRequest& request)
 {
-  request.Log(GetDeviceName(), LogTypes::IOS_WC24);
+  request.Log(GetDeviceName(), Common::Log::IOS_WC24);
 
   u32 fd = Memory::Read_U32(request.buffer_in);
   u32 how = Memory::Read_U32(request.buffer_in + 4);
@@ -417,7 +419,7 @@ IPCCommandResult NetIPTop::HandleListenRequest(const IOCtlRequest& request)
   u32 BACKLOG = Memory::Read_U32(request.buffer_in + 0x04);
   u32 ret = listen(WiiSockMan::GetInstance().GetHostSocket(fd), BACKLOG);
 
-  request.Log(GetDeviceName(), LogTypes::IOS_WC24);
+  request.Log(GetDeviceName(), Common::Log::IOS_WC24);
   return GetDefaultReply(WiiSockMan::GetNetErrorCode(ret, "SO_LISTEN", false));
 }
 
@@ -427,7 +429,7 @@ IPCCommandResult NetIPTop::HandleGetSockOptRequest(const IOCtlRequest& request)
   u32 level = Memory::Read_U32(request.buffer_out + 4);
   u32 optname = Memory::Read_U32(request.buffer_out + 8);
 
-  request.Log(GetDeviceName(), LogTypes::IOS_WC24);
+  request.Log(GetDeviceName(), Common::Log::IOS_WC24);
 
   // Do the level/optname translation
   int nat_level = MapWiiSockOptLevelToNative(level);
@@ -493,7 +495,7 @@ IPCCommandResult NetIPTop::HandleGetSockNameRequest(const IOCtlRequest& request)
 {
   u32 fd = Memory::Read_U32(request.buffer_in);
 
-  request.Log(GetDeviceName(), LogTypes::IOS_WC24);
+  request.Log(GetDeviceName(), Common::Log::IOS_WC24);
 
   sockaddr sa;
   socklen_t sa_len = sizeof(sa);
@@ -542,7 +544,7 @@ IPCCommandResult NetIPTop::HandleGetPeerNameRequest(const IOCtlRequest& request)
 
 IPCCommandResult NetIPTop::HandleGetHostIDRequest(const IOCtlRequest& request)
 {
-  request.Log(GetDeviceName(), LogTypes::IOS_WC24);
+  request.Log(GetDeviceName(), Common::Log::IOS_WC24);
   const DefaultInterface interface = GetSystemDefaultInterfaceOrFallback();
   return GetDefaultReply(Common::swap32(interface.inet));
 }
@@ -697,9 +699,9 @@ IPCCommandResult NetIPTop::HandleGetHostByNameRequest(const IOCtlRequest& reques
 
   for (int i = 0; remoteHost->h_addr_list[i]; ++i)
   {
-    u32 ip = Common::swap32(*(u32*)(remoteHost->h_addr_list[i]));
-    std::string ip_s =
-        StringFromFormat("%i.%i.%i.%i", ip >> 24, (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff);
+    const u32 ip = Common::swap32(*(u32*)(remoteHost->h_addr_list[i]));
+    const std::string ip_s =
+        fmt::format("{}.{}.{}.{}", ip >> 24, (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff);
     DEBUG_LOG(IOS_NET, "addr%i:%s", i, ip_s.c_str());
   }
 
@@ -858,10 +860,13 @@ IPCCommandResult NetIPTop::HandleGetInterfaceOptRequest(const IOCtlVRequest& req
       }
     }
 #elif defined(__linux__) && !defined(__ANDROID__)
-    if (res_init() == 0)
-      address = ntohl(_res.nsaddr_list[0].sin_addr.s_addr);
-    else
-      WARN_LOG(IOS_NET, "Call to res_init failed");
+    if (!Core::WantsDeterminism())
+    {
+      if (res_init() == 0)
+        address = ntohl(_res.nsaddr_list[0].sin_addr.s_addr);
+      else
+        WARN_LOG(IOS_NET, "Call to res_init failed");
+    }
 #endif
     if (address == 0)
       address = default_main_dns_resolver;
@@ -1038,7 +1043,7 @@ IPCCommandResult NetIPTop::HandleGetAddressInfoRequest(const IOCtlVRequest& requ
     ret = SO_ERROR_HOST_NOT_FOUND;
   }
 
-  request.Dump(GetDeviceName(), LogTypes::IOS_NET, LogTypes::LINFO);
+  request.Dump(GetDeviceName(), Common::Log::IOS_NET, Common::Log::LINFO);
   return GetDefaultReply(ret);
 }
 

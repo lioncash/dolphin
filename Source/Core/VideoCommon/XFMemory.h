@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <array>
+
 #include "Common/BitField.h"
 #include "Common/CommonTypes.h"
 #include "VideoCommon/CPMemory.h"
@@ -130,7 +132,7 @@ enum
   // XFMEM_SETPROJECTIONORTHO2 = 0x1027,
   XFMEM_SETNUMTEXGENS = 0x103f,
   XFMEM_SETTEXMTXINFO = 0x1040,
-  XFMEM_SETPOSMTXINFO = 0x1050,
+  XFMEM_SETPOSTMTXINFO = 0x1050,
 };
 
 union LitChannel
@@ -245,7 +247,9 @@ struct Viewport
 
 struct Projection
 {
-  float rawProjection[6];
+  using Raw = std::array<float, 6>;
+
+  Raw rawProjection;
   u32 type;  // only GX_PERSPECTIVE or GX_ORTHOGRAPHIC are allowed
 };
 
@@ -295,3 +299,6 @@ extern XFMemory xfmem;
 void LoadXFReg(u32 transferSize, u32 address, DataReader src);
 void LoadIndexedXF(u32 val, int array);
 void PreprocessIndexedXF(u32 val, int refarray);
+int GetXFTransferInfo(const u8* data, std::string* name, std::string* desc);
+int GetXFRegInfo(u32 newValue, u32 address, std::string* name, std::string* desc);
+void SimulateXFTransfer(const u8* data, XFMemory* xf, bool* projection_set, bool* viewport_set);
