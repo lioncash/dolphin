@@ -772,20 +772,20 @@ static void SetWiiInputDisplayString(int remoteID, const DataReportBuilder& rpt,
 // NOTE: CPU Thread
 void CheckPadStatus(const GCPadStatus* PadStatus, int controllerID)
 {
-  s_padState.A = ((PadStatus->button & PAD_BUTTON_A) != 0);
-  s_padState.B = ((PadStatus->button & PAD_BUTTON_B) != 0);
-  s_padState.X = ((PadStatus->button & PAD_BUTTON_X) != 0);
-  s_padState.Y = ((PadStatus->button & PAD_BUTTON_Y) != 0);
-  s_padState.Z = ((PadStatus->button & PAD_TRIGGER_Z) != 0);
-  s_padState.Start = ((PadStatus->button & PAD_BUTTON_START) != 0);
+  s_padState.A = PadStatus->IsButtonSet(PAD_BUTTON_A);
+  s_padState.B = PadStatus->IsButtonSet(PAD_BUTTON_B);
+  s_padState.X = PadStatus->IsButtonSet(PAD_BUTTON_X);
+  s_padState.Y = PadStatus->IsButtonSet(PAD_BUTTON_Y);
+  s_padState.Z = PadStatus->IsButtonSet(PAD_TRIGGER_Z);
+  s_padState.Start = PadStatus->IsButtonSet(PAD_BUTTON_START);
 
-  s_padState.DPadUp = ((PadStatus->button & PAD_BUTTON_UP) != 0);
-  s_padState.DPadDown = ((PadStatus->button & PAD_BUTTON_DOWN) != 0);
-  s_padState.DPadLeft = ((PadStatus->button & PAD_BUTTON_LEFT) != 0);
-  s_padState.DPadRight = ((PadStatus->button & PAD_BUTTON_RIGHT) != 0);
+  s_padState.DPadUp = PadStatus->IsButtonSet(PAD_BUTTON_UP);
+  s_padState.DPadDown = PadStatus->IsButtonSet(PAD_BUTTON_DOWN);
+  s_padState.DPadLeft = PadStatus->IsButtonSet(PAD_BUTTON_LEFT);
+  s_padState.DPadRight = PadStatus->IsButtonSet(PAD_BUTTON_RIGHT);
 
-  s_padState.L = ((PadStatus->button & PAD_TRIGGER_L) != 0);
-  s_padState.R = ((PadStatus->button & PAD_TRIGGER_R) != 0);
+  s_padState.L = PadStatus->IsButtonSet(PAD_TRIGGER_L);
+  s_padState.R = PadStatus->IsButtonSet(PAD_TRIGGER_R);
   s_padState.TriggerL = PadStatus->triggerLeft;
   s_padState.TriggerR = PadStatus->triggerRight;
 

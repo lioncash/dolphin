@@ -144,9 +144,9 @@ GCPadStatus GCPad::GetInput() const
   m_buttons->GetState(&pad.button, button_bitmasks);
 
   // set analog A/B analog to full or w/e, prolly not needed
-  if (pad.button & PAD_BUTTON_A)
+  if (pad.IsButtonSet(PAD_BUTTON_A))
     pad.analogA = 0xFF;
-  if (pad.button & PAD_BUTTON_B)
+  if (pad.IsButtonSet(PAD_BUTTON_B))
     pad.analogB = 0xFF;
 
   // dpad

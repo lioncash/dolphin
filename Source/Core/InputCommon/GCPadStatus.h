@@ -31,6 +31,8 @@ enum PadButton
 
 struct GCPadStatus
 {
+  [[nodiscard]] bool IsButtonSet(PadButton pb) const { return (button & pb) != 0; }
+
   u16 button;       // Or-ed PAD_BUTTON_* and PAD_TRIGGER_* bits
   u8 stickX;        // 0 <= stickX       <= 255
   u8 stickY;        // 0 <= stickY       <= 255
